@@ -59,11 +59,11 @@ const Initializeconnection = async () => {
         console.log("Connected to DB ✔");
 
         // ROUTES
-        app.use("/user", authRouter);
-        app.use("/problems", problemRouter);
-        app.use("/submission", submitRouter);
-        app.use("/contests", contestRouter);
-        app.use("/leaderboard", leaderboardRoutes);
+      app.use("/api/user", authRouter);
+app.use("/api/problems", problemRouter);
+app.use("/api/submission", submitRouter);
+app.use("/api/contests", contestRouter);
+app.use("/api/leaderboard", leaderboardRoutes);
 
         // ❗ IMPORTANT CHANGE HERE
         server.listen(port, () => {
