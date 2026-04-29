@@ -152,5 +152,12 @@ const deleteProfile = async(req,res)=>{
     catch(error){
         res.status(500).json({error:"Error deleting user profile", details:error.message});
 }}
+console.log("CONTROLLER LOADED");
 
-module.exports = {register,login,logout,adminRegister,deleteProfile};
+module.exports = {
+    register,
+    login,
+    logout,
+    adminRegister,
+    deleteProfile
+};

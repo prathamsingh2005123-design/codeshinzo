@@ -4,7 +4,8 @@ const authRouter = express.Router();
 const {register,login,logout,adminRegister} = require('../controllers/userAuthent');
 const userMiddleware = require('../middleware/userMiddleware');
 const adminmiddleware = require('../middleware/adminmiddleware');
-const { deleteProfile } = require('../controllers/userAuthent.js');
+const userController = require('../controllers/userAuthent.js');
+const deleteProfile = userController.deleteProfile;
 
 
 // register
