@@ -3,6 +3,7 @@ const User = require('../models/user');
 const validate = require('../utils/validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const Submission= require('../models/submissions');
 
 
 const register = async (req, res) => {
@@ -142,7 +143,7 @@ const adminRegister = async (req, res) => {
 
 const deleteProfile = async(req,res)=>{
     try{
-        const userId = req.result._id;
+        const userId = req.user._id;
         await User.findByIdAndDelete(userId);
         // delete all submissions of the user
         await Submission.deleteMany({userId});
