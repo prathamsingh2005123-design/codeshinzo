@@ -18,7 +18,15 @@ authRouter.post("/register",register);
 authRouter.post("/login",login);                
 authRouter.post("/logout",logout);
 authRouter.post("/admin/register",adminmiddleware, adminRegister);
-authRouter.delete("/deleteprofile",userMiddleware,deleteProfile);
+const userController = require('../controllers/userAuthent.js');
+
+console.log("deleteProfile check:", typeof userController.deleteProfile);
+
+authRouter.delete(
+  "/deleteprofile",
+  userMiddleware,
+  userController.deleteProfile
+);
 authRouter.get("/check-auth",userMiddleware,(req,res)=>{
     const reply={
         firstName:req.user.firstName,
