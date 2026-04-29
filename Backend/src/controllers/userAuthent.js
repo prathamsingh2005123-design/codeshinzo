@@ -7,6 +7,7 @@ const Submission= require('../models/submissions');
 
 
 const register = async (req, res) => {
+    console.log("userAuthent controller loaded");
     try {
         validate(req.body);
 
@@ -152,7 +153,7 @@ const deleteProfile = async(req,res)=>{
     catch(error){
         res.status(500).json({error:"Error deleting user profile", details:error.message});
 }}
-console.log("CONTROLLER LOADED");
+
 
 module.exports = {
     register,

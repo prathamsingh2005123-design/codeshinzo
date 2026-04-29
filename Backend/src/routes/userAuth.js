@@ -5,8 +5,12 @@ const {register,login,logout,adminRegister} = require('../controllers/userAuthen
 const userMiddleware = require('../middleware/userMiddleware');
 const adminmiddleware = require('../middleware/adminmiddleware');
 const userController = require('../controllers/userAuthent.js');
-const deleteProfile = userController.deleteProfile;
 
+authRouter.delete(
+  "/deleteprofile",
+  userMiddleware,
+  userController.deleteProfile
+);
 
 // register
 
