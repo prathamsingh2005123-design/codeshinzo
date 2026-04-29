@@ -50,7 +50,7 @@ function Signup() {
     try {
       const token = response.credential;
 
-      const res = await axios.post("/api/auth/google", {
+      const res = await axios.post("/auth/google", {
         token,
       });
 
