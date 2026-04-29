@@ -197,6 +197,12 @@ function Signup() {
               Login
             </NavLink>
           </div>
+          <button
+  type="submit"
+  className="w-full py-4 mt-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-md transition"
+>
+  Signup
+</button>
 
         </form>
       </div>
