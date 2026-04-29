@@ -23,10 +23,17 @@ const port = Number(process.env.PORT) || 3000;
 // ✅ CREATE SERVER (IMPORTANT)
 const server = http.createServer(app);
 
-// ✅ SOCKET SETUP
+// ✅ ALLOWED ORIGINS (NEW SAFE ADDITION)
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://codeshinzo.vercel.app',
+    'https://codeshinzo-git-main-coderpro1762-9312s-projects.vercel.app'
+];
+
+// ✅ SOCKET SETUP (UPDATED)
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost:5173',
+        origin: allowedOrigins,
         credentials: true,
     },
 });
@@ -34,8 +41,9 @@ const io = new Server(server, {
 // ✅ INIT SOCKET
 initContestSocket(io);
 
+// ✅ EXPRESS CORS (UPDATED)
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
 }));
 
@@ -51,7 +59,6 @@ const Initializeconnection = async () => {
         console.log("Connected to DB ✔");
 
         // ROUTES
-        
         app.use("/api/user", authRouter);
         app.use("/api/problems", problemRouter);
         app.use("/api/submission", submitRouter);
