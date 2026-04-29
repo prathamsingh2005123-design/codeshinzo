@@ -28,6 +28,12 @@ const contestSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+        // ── NEW ──
+    tabSwitchBanEnabled: {
+      type: Boolean,
+      default: false,
+    },
+
   },
   { timestamps: true }
 );

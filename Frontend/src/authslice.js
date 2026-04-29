@@ -1,9 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axiosClient from "./utils/axiosClient";
 
-/* =========================
-   REGISTER USER
-========================= */
+/* REGISTER */
 export const registerUser = createAsyncThunk(
   "auth/register",
   async (userData, { rejectWithValue }) => {
@@ -20,13 +18,10 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-/* =========================
-   LOGIN USER
-========================= */
+/* LOGIN */
 export const loginUser = createAsyncThunk(
   "auth/login",
   async (credentials, { rejectWithValue }) => {
-      console.log("THUNK STARTED 🔥", credentials);
     try {
       const response = await axiosClient.post("/user/login", credentials);
       return response.data;
@@ -40,9 +35,7 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-/* =========================
-   CHECK AUTH
-========================= */
+/* CHECK AUTH */
 export const checkAuth = createAsyncThunk(
   "auth/checkAuth",
   async (_, { rejectWithValue }) => {
@@ -50,18 +43,12 @@ export const checkAuth = createAsyncThunk(
       const response = await axiosClient.get("/user/check-auth");
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message ||
-        error.message ||
-        null
-      );
+      return rejectWithValue(null);
     }
   }
 );
 
-/* =========================
-   LOGOUT USER
-========================= */
+/* LOGOUT */
 export const logoutUser = createAsyncThunk(
   "auth/logout",
   async (_, { rejectWithValue }) => {
@@ -78,26 +65,22 @@ export const logoutUser = createAsyncThunk(
   }
 );
 
-/* =========================
-   AUTH SLICE (OLD STABLE VERSION)
-========================= */
 const authSlice = createSlice({
   name: "auth",
   initialState: {
     user: null,
     isAuthenticated: false,
-    loading: false,
+    loading: true,
     error: null,
   },
 
   reducers: {
     setUser: (state, action) => {
-      state.user = action.payload.user;
+      state.user = action.payload?.user || action.payload;
       state.isAuthenticated = true;
       state.loading = false;
       state.error = null;
     },
-
     logoutLocal: (state) => {
       state.user = null;
       state.isAuthenticated = false;
@@ -112,47 +95,63 @@ const authSlice = createSlice({
       /* REGISTER */
       .addCase(registerUser.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.user;
-        state.isAuthenticated = true;
+        const userData = action.payload?.user || action.payload?.reply;
+        state.user = userData;
+        state.isAuthenticated = !!userData;
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.isAuthenticated = false;
       })
 
       /* LOGIN */
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.user;
-        state.isAuthenticated = true;
+        const userData = action.payload?.user || action.payload?.reply;
+        state.user = userData;
+        state.isAuthenticated = !!userData;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.isAuthenticated = false;
       })
 
       /* CHECK AUTH */
-     .addCase(checkAuth.fulfilled, (state, action) => {
-  state.loading = false;
-
-  if (action.payload?.user) {
-    state.user = action.payload.user;
-    state.isAuthenticated = true;
-  }
-  // ❌ else REMOVE kar de
-})
+      .addCase(checkAuth.fulfilled, (state, action) => {
+        state.loading = false;
+        const userData = action.payload?.reply || action.payload?.user;
+        if (userData && userData._id) {
+          state.user = userData;
+          state.isAuthenticated = true;
+        } else {
+          state.user = null;
+          state.isAuthenticated = false;
+        }
+      })
       .addCase(checkAuth.rejected, (state) => {
         state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
       })
 
       /* LOGOUT */
       .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(logoutUser.rejected, (state) => {
         state.user = null;
         state.isAuthenticated = false;
         state.loading = false;

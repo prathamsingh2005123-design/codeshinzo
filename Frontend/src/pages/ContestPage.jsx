@@ -98,26 +98,27 @@ const ContestPage = () => {
   }, [contest]);
 
   // ── Tab Switch Detection ──
-  const handleVisibilityChange = useCallback(async () => {
-    // Only detect during live contest and user is not already banned
-    if (contestStatus !== "live" || isBanned || tabSwitchRef.current) return;
-    if (document.hidden) {
-      tabSwitchRef.current = true;
-      try {
-        const res = await axiosClient.post("/contests/ban/tabswitch", {
-          contestId: id,
-        });
-        setIsBanned(true);
-        setTabSwitchCount(res.data.tabSwitchCount || 1);
-        setShowBanAlert(true);
-        console.log("🚩 Tab switch detected — user banned");
-      } catch (err) {
-        console.log("Tab switch ban error:", err);
-      } finally {
-        tabSwitchRef.current = false;
-      }
+const handleVisibilityChange = useCallback(async () => {
+  // ── Check if tab switch ban is enabled for this contest ──
+  if (!contest?.tabSwitchBanEnabled) return; // ← NEW CHECK
+
+  if (contestStatus !== "live" || isBanned || tabSwitchRef.current) return;
+  if (document.hidden) {
+    tabSwitchRef.current = true;
+    try {
+      const res = await axiosClient.post("/contests/ban/tabswitch", {
+        contestId: id,
+      });
+      setIsBanned(true);
+      setTabSwitchCount(res.data.tabSwitchCount || 1);
+      setShowBanAlert(true);
+    } catch (err) {
+      console.log("Tab switch ban error:", err);
+    } finally {
+      tabSwitchRef.current = false;
     }
-  }, [contestStatus, isBanned, id]);
+  }
+}, [contestStatus, isBanned, id, contest?.tabSwitchBanEnabled]); // ← dependency add
 
   useEffect(() => {
     document.addEventListener("visibilitychange", handleVisibilityChange);
