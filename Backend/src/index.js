@@ -59,7 +59,7 @@ const Initializeconnection = async () => {
         console.log("Connected to DB ✔");
 
         // ROUTES
-        
+        app.use("/api/user", authRouter);
         app.use("/api/problems", problemRouter);
         app.use("/api/submission", submitRouter);
         app.use("/api/contests", contestRouter);
