@@ -45,8 +45,6 @@ module.exports = router;// this is submit.js - the router for handling code subm
 
 
 
-console.log("submit.js loaded ✔");
-console.log("submitSolution:", typeof submitSolution);
 
 /* =========================
    SUBMIT ROUTE
