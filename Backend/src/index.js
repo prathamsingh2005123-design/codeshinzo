@@ -43,7 +43,7 @@ initContestSocket(io);
 
 // ✅ EXPRESS CORS (UPDATED)
 app.use(cors({
-    origin: allowedOrigins,
+    origin: ["http://localhost:5173", "https://codeshinzo.vercel.app"],
     credentials: true,
 }));
 

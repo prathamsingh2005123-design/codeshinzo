@@ -1,0 +1,33 @@
+[33m85f5950[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mbackup-current[m[33m)[m fix: production login, cors and auth infinite loop resolved
+[33me7f3789[m fix auth infinite loop + production fixes
+[33m9e9eb72[m fix: auth, cors, deployment issues resolved
+[33m18f7611[m fix: production api baseURL and auth fixes
+[33m14ca28b[m fix: remove node_modules and clean production setup
+[33m868fba5[m added token in login response
+[33m2910ee6[m switched auth from cookies to jwt headers
+[33me86b45e[m fixed cookie for production
+[33m307a0f7[m added db debug log
+[33m8aa3a8c[m fixed db connection to use Leetcode;
+[33m5ef8284[m Fix: Add missing module.exports to userMiddleware
+[33m84f8f3f[m Downgrade Express to 4.x for Render compatibility
+[33m3919f96[m update code
+[33mce3115e[m final fix: clean userAuth routes - resolve deleteProfile crash
+[33ma50fc50[m fix: remove duplicate router and controller declarations
+[33m1f48555[m fix: resolve deleteProfile route handler issue
+[33m6e6e691[m fix: resolve deleteProfile undefined handler and import issue
+[33m8192b53[m fix: deleteProfile crash + middleware + submission fix
+[33m72d0186[m fix: deleteProfile crash + middleware + submission fix
+[33mea1deac[m fix: resolve deleteProfile crash and missing Submission import
+[33m765dd8f[m fix: clean problem router and remove broken code
+[33mcb28e71[m fix: clean problem router and remove broken code
+[33md405e49[m fix: restore api routes consistency
+[33m4774e64[m fix: restore api prefix in routes
+[33mecbec6a[m update code
+[33m68d3c62[m fix: axios baseURL production fix
+[33m084f325[m fix: axios baseURL production fix
+[33md71caa3[m fix: production CORS for Vercel + socket
+[33ma764ad6[m fix: remove localhost and fix env + cors
+[33mc9b445a[m fix: add signup button
+[33m697ae84[m fix: rename contestsocket.js to contestSocket.js
+[33m08c46a4[m moved backend into Backend folder
+[33m3df01d7[m first commit - CodeShinzo
