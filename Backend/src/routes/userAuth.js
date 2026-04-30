@@ -35,11 +35,10 @@ authRouter.post("/admin/register", adminmiddleware, userController.adminRegister
 // =======================
 // DELETE PROFILE ROUTE
 // =======================
-authRouter.delete(
-  "/deleteprofile",
-  userMiddleware,
-  userController.deleteProfile
-);
+// FIX: Wrap in arrow function for Express 5 compatibility
+authRouter.delete("/deleteprofile", userMiddleware, (req, res) => {
+    userController.deleteProfile(req, res);
+});
 
 
 // =======================

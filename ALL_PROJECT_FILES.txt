@@ -1,0 +1,5955 @@
+﻿================================================================================
+LEETCODE PROJECT - ALL SOURCE FILES COMBINED
+================================================================================
+
+
+================================================================================
+FILE: Backend\.env
+================================================================================
+
+PORT=3000
+DB_CONNECTION_STRING=mongodb+srv://dhruv:Dhruv12345@codingadda.gvgb1b8.mongodb.net/Leetcode
+JWT_SECRET_KEY=06d83fcda920048027d9109e4bec4eacd76e7dd8e7a2c4376ae7162be5aaa7a1
+REDIS_PASSWORD=gcEInWiRF8nVJ3nbBTIllxhLY0LodiqY
+GOOGLE_CLIENT_ID=119229563975-rg28o97on0qc4k68uu7j9jufcbentusl.apps.googleusercontent.com
+VITE_BACKEND_URL=https://codeshinzo-backend.onrender.com
+
+================================================================================
+FILE: Backend\add_filename_comments.js
+================================================================================
+
+// Filename: add_filename_comments.js
+const fs = require('fs').promises;
+const path = require('path');
+
+async function addFilenameComment(dir) {
+  const files = await fs.readdir(dir, { withFileTypes: true });
+  let updatedCount = 0;
+
+  for (const file of files) {
+    const fullPath = path.join(dir, file.name);
+    const relPath = path.relative('.', fullPath).replace(/\\/g, '/');
+
+    if (file.isDirectory()) {
+      updatedCount += await addFilenameComment(fullPath);
+    } else {
+      const ext = path.extname(file.name).toLowerCase();
+      if (['.js', '.jsx', '.css'].includes(ext)) {
+        try {
+          let content = await fs.readFile(fullPath, 'utf8');
+          
+          // Check if already has filename comment
+          const jsCommentCheck = content.trim().startsWith('// Filename:');
+          const cssCommentCheck = ext === '.css' && content.trim().startsWith('/* Filename:');
+          
+          if (!jsCommentCheck && !cssCommentCheck) {
+            let comment;
+            if (ext === '.css') {
+              comment = `/* Filename: ${relPath} */\n`;
+            } else {
+              comment = `// Filename: ${relPath}\n`;
+            }
+            const newContent = comment + content;
+            await fs.writeFile(fullPath, newContent, 'utf8');
+            console.log(`Updated: ${relPath}`);
+            updatedCount++;
+          } else {
+            console.log(`Skipped (already has): ${relPath}`);
+          }
+        } catch (err) {
+          console.error(`Error processing ${relPath}:`, err.message);
+        }
+      }
+    }
+  }
+  return updatedCount;
+}
+
+(async () => {
+  try {
+    const totalUpdated = await addFilenameComment('.');
+    console.log(`\\nTotal files updated: ${totalUpdated}`);
+  } catch (err) {
+    console.error('Script error:', err);
+  }
+})();
+
+
+
+================================================================================
+FILE: Backend\index.js
+================================================================================
+
+// Filename: index.js
+// Root entrypoint fallback so "nodemon index.js" works from project root.
+// It re-uses the existing src/index.js Express app startup.
+require('dotenv').config();
+require('./src/index');
+
+
+================================================================================
+FILE: Backend\nodemon.json
+================================================================================
+
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "exec": "node src/index.js"
+}
+
+
+================================================================================
+FILE: Backend\package.json
+================================================================================
+
+{
+  "name": "leetcode-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.15.0",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.1",
+    "redis": "^5.11.0",
+    "socket.io": "^4.8.3",
+    "validator": "^13.15.26"
+  }
+}
+
+
+================================================================================
+FILE: Backend\src\index.js
+================================================================================
+
+require('dotenv').config();
+const express = require('express');
+const app = express();
+const main = require('./config/db');
+const cookieParser = require('cookie-parser');
+const cors = require('cors');
+
+// âœ… NEW
+const http = require("http");
+const { Server } = require("socket.io");
+const initContestSocket = require("./socket/contestSocket");
+
+// routes
+const authRouter = require('./routes/userAuth');
+const problemRouter = require('./routes/problemCreator');
+const submitRouter = require('./routes/submit');
+const contestRouter = require("./routes/contestRoutes");
+const leaderboardRoutes = require("./routes/leaderboardRoutes");
+const authRoutes = require("./routes/auth");
+
+const port = Number(process.env.PORT) || 3000;
+
+// âœ… CREATE SERVER (IMPORTANT)
+const server = http.createServer(app);
+
+// âœ… ALLOWED ORIGINS (NEW SAFE ADDITION)
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://codeshinzo.vercel.app',
+    'https://codeshinzo-git-main-coderpro1762-9312s-projects.vercel.app'
+];
+
+// âœ… SOCKET SETUP (UPDATED)
+const io = new Server(server, {
+    cors: {
+        origin: allowedOrigins,
+        credentials: true,
+    },
+});
+
+// âœ… INIT SOCKET
+initContestSocket(io);
+
+// âœ… EXPRESS CORS (UPDATED)
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true,
+}));
+
+app.use(express.json());
+app.use(cookieParser());
+
+const Initializeconnection = async () => {
+    try {
+        console.log('DB_CONNECTION_STRING:', process.env.DB_CONNECTION_STRING);
+
+        await main();
+
+        console.log("Connected to DB âœ”");
+
+        // ROUTES
+    app.use("/api/user", authRouter);
+app.use("/api/problems", problemRouter);
+app.use("/api/submission", submitRouter);
+app.use("/api/contests", contestRouter);
+app.use("/api/leaderboard", leaderboardRoutes);
+
+        // â— IMPORTANT CHANGE HERE
+        server.listen(port, () => {
+            console.log(`Server running on port ${port}`);
+        });
+
+    } catch (error) {
+        console.error("DB connection error:", error);
+        process.exit(1);
+    }
+};
+
+Initializeconnection();
+
+================================================================================
+FILE: Backend\src\config\db.js
+================================================================================
+
+// Filename: src/config/db.js
+const mongoose = require('mongoose');
+
+async function main() {
+    try {
+        console.log('Attempting to connect to database...');
+        await mongoose.connect(process.env.DB_CONNECTION_STRING);
+        console.log('Database connection established');
+    } catch (error) {
+        console.error('Database connection failed:', error);
+        throw error;
+    }
+}
+
+module.exports = main;
+
+================================================================================
+FILE: Backend\src\config\redis.js
+================================================================================
+
+// Filename: src/config/redis.js
+
+
+================================================================================
+FILE: Backend\src\controllers\contestAdminRequestController.js
+================================================================================
+
+// Filename: src/controllers/contestAdminRequestController.js
+const Request = require("../models/contestAdminRequest");
+
+// USER REQUEST
+const requestAdmin = async (req, res) => {
+  const { contestId } = req.body;
+
+  const request = await Request.create({
+    userId: req.user._id,
+    contestId,
+  });
+
+  res.json({ success: true, request });
+};
+
+module.exports = { requestAdmin };
+
+================================================================================
+FILE: Backend\src\controllers\contestBanController.js
+================================================================================
+
+// Filename: src/controllers/contestBanController.js
+const ContestBan = require("../models/contestBan");
+const Contest = require("../models/contest");
+
+/* =========================
+   BAN USER (tab switch)
+========================= */
+const banUser = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { contestId } = req.body;
+
+    if (!contestId) {
+      return res.status(400).json({ success: false, message: "contestId required" });
+    }
+
+    // Contest exist karta hai check karo
+    const contest = await Contest.findById(contestId);
+    if (!contest) {
+      return res.status(404).json({ success: false, message: "Contest not found" });
+    }
+
+    // Agar pehle se ban hai toh tabSwitchCount badhao
+    const existing = await ContestBan.findOne({ userId, contestId });
+
+    if (existing) {
+      existing.tabSwitchCount += 1;
+      await existing.save();
+      return res.status(200).json({
+        success: true,
+        message: "Tab switch count updated",
+        ban: existing,
+        tabSwitchCount: existing.tabSwitchCount,
+      });
+    }
+
+    // Naya ban create karo
+    const ban = await ContestBan.create({
+      userId,
+      contestId,
+      reason: "Tab switch detected",
+      tabSwitchCount: 1,
+    });
+
+    console.log(`ðŸš© User ${userId} banned from contest ${contestId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "User banned from contest due to tab switch",
+      ban,
+      tabSwitchCount: 1,
+    });
+
+  } catch (err) {
+    console.log("BAN ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* =========================
+   CHECK BAN STATUS
+========================= */
+const checkBanStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { contestId } = req.params;
+
+    const ban = await ContestBan.findOne({ userId, contestId });
+
+    return res.status(200).json({
+      success: true,
+      isBanned: !!ban,
+      tabSwitchCount: ban?.tabSwitchCount || 0,
+      ban: ban || null,
+    });
+
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* =========================
+   GET ALL BANNED USERS (for leaderboard flag)
+========================= */
+const getBannedUsers = async (req, res) => {
+  try {
+    const { contestId } = req.params;
+
+    const bans = await ContestBan.find({ contestId })
+      .populate("userId", "firstName emailId");
+
+    return res.status(200).json({
+      success: true,
+      bans,
+    });
+
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { banUser, checkBanStatus, getBannedUsers };
+
+================================================================================
+FILE: Backend\src\controllers\contestController.js
+================================================================================
+
+const Contest = require("../models/contest");
+
+const createContest = async (req, res) => {
+  try {
+    const { title, startTime, duration, problems } = req.body;
+
+    console.log("ðŸ”¥ CREATE CONTEST HIT");
+    console.log("BODY:", req.body);
+    console.log("USER:", req.user);
+
+    const contest = await Contest.create({
+      title,
+      startTime,
+      duration,
+      problems,
+      createdBy: req.user?._id,
+    });
+
+    console.log("âœ… CONTEST CREATED:", contest._id);
+
+    return res.json({ success: true, contest });
+
+  } catch (err) {
+    console.log("âŒ CREATE CONTEST ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const getAllContests = async (req, res) => {
+  try {
+    const contests = await Contest.find().sort({ createdAt: -1 });
+    return res.json({ success: true, contests });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const getContestById = async (req, res) => {
+  try {
+    const contest = await Contest.findById(req.params.id).populate("problems");
+    return res.json({ success: true, contest });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// â”€â”€ NEW: Delete Contest â”€â”€
+const deleteContest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const contest = await Contest.findByIdAndDelete(id);
+    if (!contest) {
+      return res.status(404).json({ success: false, message: "Contest not found" });
+    }
+    console.log("âœ… CONTEST DELETED:", id);
+    return res.json({ success: true, message: "Contest deleted successfully" });
+  } catch (err) {
+    console.log("âŒ DELETE CONTEST ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { createContest, getAllContests, getContestById, deleteContest };
+
+================================================================================
+FILE: Backend\src\controllers\leaderboard.js
+================================================================================
+
+// Filename: src/controllers/leaderboard.js
+const Submission = require("../models/submissions");
+
+const getLeaderboard = async (req, res) => {
+  try {
+    const { contestId } = req.params;
+
+    const board = await Submission.aggregate([
+      {
+        $match: {
+          contestId: contestId, // ðŸ”¥ IMPORTANT
+        },
+      },
+      {
+        $group: {
+          _id: "$userId",
+          score: { $sum: "$score" },
+        },
+      },
+      {
+        $sort: { score: -1 },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      {
+        $unwind: "$user",
+      },
+      {
+        $project: {
+          _id: 1,
+          score: 1,
+          "userId.name": "$user.name",
+        },
+      },
+    ]);
+
+    res.json({ board });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = { getLeaderboard };
+
+================================================================================
+FILE: Backend\src\controllers\leaderboardController.js
+================================================================================
+
+const Leaderboard = require("../models/leaderboard");
+
+const getContestLeaderboard = async (req, res) => {
+  try {
+    const { contestId } = req.params;
+
+    if (!contestId) {
+      return res.status(400).json({
+        success: false,
+        message: "contestId required",
+      });
+    }
+
+    const leaderboard = await Leaderboard.find({ contestId })
+      .populate("userId", "firstName emailId");
+
+    const board = leaderboard
+      .map((entry) => ({
+        userId: entry.userId?._id,
+        name:
+          entry.userId?.firstName ||
+          entry.userId?.emailId ||
+          "Unknown",
+        score: entry.score,
+        solved: entry.solvedCount,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map((entry, index) => ({
+        ...entry,
+        rank: index + 1,
+      }));
+
+    return res.status(200).json({
+      success: true,
+      board,
+    });
+  } catch (err) {
+    console.log("âŒ Leaderboard Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+module.exports = { getContestLeaderboard };
+
+================================================================================
+FILE: Backend\src\controllers\submitController.js
+================================================================================
+
+// Filename: src/controllers/submitController.js
+const Submission = require("../models/submissions");
+const Leaderboard = require("../models/leaderboard");
+const Problem = require("../models/problem");
+const mongoose = require("mongoose");
+
+const submitCode = async (req, res) => {
+  console.log("ðŸ”¥ SUBMIT CONTROLLER HIT");
+  console.log("ðŸš€ SUBMIT API HIT");
+  console.log("ðŸ”¥ contestId =", contestId);
+console.log("ðŸ”¥ userId =", req.user._id);
+  const { problemId, code, language, contestId } = req.body;
+
+  const normalizedProblemId = new mongoose.Types.ObjectId(problemId);
+
+  const problem = await Problem.findById(problemId);
+
+  const submission = await Submission.create({
+    userId: req.user._id,
+    problemId,
+    contestId,
+    code,
+    language,
+  });
+
+  const verdict = "Accepted";
+
+  const scoreMap = {
+    easy: 100,
+    medium: 200,
+    hard: 300,
+  };
+
+  const score = scoreMap[problem.difficulty.toLowerCase()] || 0;
+
+  if (contestId && verdict === "Accepted") {
+    let entry = await Leaderboard.findOne({
+      contestId,
+      userId: req.user._id,
+    });
+
+    if (!entry) {
+      entry = await Leaderboard.create({
+        contestId,
+        userId: req.user._id,
+        score: 0,
+        solvedCount: 0,
+        solvedProblems: [],
+      });
+    }
+
+    // ðŸ”¥ IMPORTANT FIX
+    const alreadySolved = entry.solvedProblems.some(
+      (p) => p.toString() === normalizedProblemId.toString()
+    );
+
+    if (!alreadySolved) {
+      entry.solvedProblems.push(normalizedProblemId);
+      entry.score += score;
+      entry.solvedCount += 1;
+      await entry.save(); // save ONLY when updated
+    }
+  }
+
+  res.json({
+    success: true,
+    message: "Submitted successfully",
+    submission,
+  });
+};
+
+module.exports = { submitCode };
+
+================================================================================
+FILE: Backend\src\controllers\userAuthent.js
+================================================================================
+
+// Filename: src/controllers/userAuthent.js
+const User = require('../models/user');
+const validate = require('../utils/validator');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const Submission= require('../models/submissions');
+
+
+const register = async (req, res) => {
+    console.log("userAuthent controller loaded");
+    try {
+        validate(req.body);
+
+        const { firstName, LastName, emailId, password, ...rest } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = await User.create({
+            ...rest,
+            firstName,
+            LastName,
+            emailId,
+            role: "user",
+            password: hashedPassword
+        });
+
+        const token = jwt.sign(
+            { _id: user._id, emailId: user.emailId,role:"user" },
+            process.env.JWT_SECRET_KEY,
+            { expiresIn: '1h' }
+        );
+
+            const reply={
+            firstName: user.firstName,
+            emailId: user.emailId,
+            _id: user._id,
+            role: user.role
+        }
+
+     res.cookie('token', token, {
+    httpOnly: true,
+    secure: false,        // localhost pe false
+    sameSite: "lax",      // ðŸ”¥ VERY IMPORTANT
+    maxAge: 3600000
+});
+        res.status(201).json({ message: 'User registered successfully',  user: reply });
+    } 
+
+    
+    
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+const login = async(req,res)=>{
+    console.log("ðŸš€ LOGIN API HIT");
+    try{
+        const {emailId,password} = req.body;
+        if(!emailId || !password){
+            throw new Error("Email and password are required");
+        }
+        const user = await User.findOne({emailId});
+        const match = await bcrypt.compare(password,user.password);
+        if(!match){
+            throw new Error("Invalid credentials");
+        }
+       const reply = {
+    firstName: user.firstName,
+    emailId: user.emailId,
+    _id: user._id,
+    role: user.role   
+}
+const token= jwt.sign({ _id: user._id ,role:user.role, emailId: user.emailId },process.env.JWT_SECRET_KEY,{expiresIn: '1h'});
+res.cookie('token', token, {
+    httpOnly: true,
+    secure: false,        // localhost pe false
+    sameSite: "lax",      // ðŸ”¥ VERY IMPORTANT
+    maxAge: 3600000
+});
+     res.status(200).json({
+        user: reply,
+        message: "User logged in successfully",
+     })
+
+    }
+    catch(error){
+        res.status(401).send(error.message);
+    }
+}
+
+const logout = async(req,res)=>{
+    try{
+       const {token} = req.cookies;
+       const payload = jwt.decode(token);
+       res.cookie('token', token, {
+    httpOnly: true,
+    secure: false,        // localhost pe false
+    sameSite: "lax",      // ðŸ”¥ VERY IMPORTANT
+    maxAge: 3600000
+});
+       res.send("User logged out successfully");
+        
+    }
+    catch(error){
+        res.status(500).send("Error logging out user");
+    }
+}
+
+const adminRegister = async (req, res) => {
+    try{
+        validate(req.body);
+
+        const { firstName, LastName, emailId, password, ...rest } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        const user = await User.create({
+            ...rest,
+            firstName,
+            LastName,
+            emailId,
+            password: hashedPassword,
+            role: "admin"
+        });
+
+        const token = jwt.sign(
+            { _id: user._id, emailId: user.emailId, role: "admin" },
+            process.env.JWT_SECRET_KEY,
+            { expiresIn: '1h' }
+        );
+     res.cookie('token', token, {
+    httpOnly: true,
+    secure: false,        // localhost pe false
+    sameSite: "lax",      // ðŸ”¥ VERY IMPORTANT
+    maxAge: 3600000
+});
+        res.status(201).json({ message: 'Admin registered successfully', token, userId: user._id });
+ 
+        
+    }
+    catch(error){
+        res.status(400).json({ error: error.message });
+    }
+}
+
+const deleteProfile = async(req,res)=>{
+    try{
+        const userId = req.user._id;
+        await User.findByIdAndDelete(userId);
+        // delete all submissions of the user
+        await Submission.deleteMany({userId});
+        res.send("User profile deleted successfully");
+    }
+    catch(error){
+        res.status(500).json({error:"Error deleting user profile", details:error.message});
+}}
+
+
+module.exports = {
+    register,
+    login,
+    logout,
+    adminRegister,
+    deleteProfile
+};
+
+================================================================================
+FILE: Backend\src\controllers\userProblem.js
+================================================================================
+
+// Filename: src/controllers/userProblem.js
+// Fixed userProblem.js controller
+
+const { getLanguageId, submitBatch } = require("../services/languageService");
+const Problem = require("../models/problem");
+const User = require("../models/user");
+const Submission = require("../models/submissions");
+const getStatus = (result) => {
+  const id = result?.status?.id;
+
+  if (id === 3) return "Accepted";
+  if (id === 4) return "Wrong Answer";
+  if (id === 5) return "Time Limit Exceeded";
+  if (id === 6) return "Compilation Error";
+  if (id >= 7) return "Runtime Error";
+
+  return "Pending";
+};
+
+
+const createProblem = async (req, res) => {
+
+  const {
+    title,
+    description,
+    difficulty,
+    tags,
+    visibletestcases,
+    hiddentestcases,
+    referenceSolution,
+  } = req.body;
+
+  try {
+
+    const filteredReference = referenceSolution.filter(
+      (sol) => sol.completeCode && sol.completeCode.trim() !== ""
+    );
+
+    if (filteredReference.length === 0) {
+      return res.status(400).json({
+        message: "At least one reference solution is required"
+      });
+    }
+
+    const allTestcases = [...visibletestcases, ...hiddentestcases];
+
+
+    for (const { language, completeCode } of filteredReference) {
+
+      const languageId = await getLanguageId(language);
+
+      const submissions = allTestcases.map((testcase) => ({
+        source_code: completeCode,
+        language_id: languageId,
+        stdin: testcase.input
+      }));
+
+
+      const submitResults = await submitBatch(submissions);
+
+
+      for (let i = 0; i < submitResults.length; i++) {
+
+      const normalize = (str) =>
+  (str || "").toString().trim().replace(/\r/g, "");
+
+const stdout = normalize(submitResults[i]?.stdout);
+const expected = normalize(allTestcases[i].output);
+       
+        const status = submitResults[i]?.status?.description || "";
+
+        if (status !== "Accepted" || stdout !== expected) {
+
+          return res.status(400).json({
+            message: `Reference solution failed on testcase ${i + 1}`,
+            testcase: allTestcases[i],
+            result: submitResults[i]
+          });
+
+        }
+      }
+    }
+
+const problemCreatorId = req.user?._id;
+
+    if (!problemCreatorId) {
+      return res.status(401).json({
+        message: "Unauthorized: user not found in request"
+      });
+    }
+
+
+    const userProblem = await Problem.create({
+      title,
+      description,
+      difficulty,
+      tags,
+      visibletestcases,
+      hiddentestcases,
+      referenceSolution: filteredReference,
+      problemCreator: problemCreatorId
+    });
+
+
+    res.status(201).json({
+      message: "Problem created successfully",
+      problem: userProblem
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error during problem validation",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+
+const updateProblem = async (req, res) => {
+
+  const { id } = req.params;
+
+  const {
+    title,
+    description,
+    difficulty,
+    tags,
+    visibletestcases,
+    hiddentestcases,
+    referenceSolution,
+  } = req.body;
+
+  try {
+
+    if (!id) {
+      return res.status(400).json({ message: "Problem ID is required" });
+    }
+
+    const problem = await Problem.findById(id);
+
+    if (!problem) {
+      return res.status(404).json({ message: "Problem not found" });
+    }
+
+    const filteredReference = referenceSolution.filter(
+      (sol) => sol.completeCode && sol.completeCode.trim() !== ""
+    );
+
+    const allTestcases = [...visibletestcases, ...hiddentestcases];
+
+    for (const { language, completeCode } of filteredReference) {
+
+      const languageId = await getLanguageId(language);
+
+      const submissions = allTestcases.map((testcase) => ({
+        source_code: completeCode,
+        language_id: languageId,
+        stdin: testcase.input
+      }));
+
+      const submitResults = await submitBatch(submissions);
+
+      for (let i = 0; i < submitResults.length; i++) {
+
+        const stdout = submitResults[i]?.stdout?.trim() || "";
+        const expected = allTestcases[i].output.trim();
+        const status = submitResults[i]?.status?.description || "";
+
+        if (status !== "Accepted" || stdout !== expected) {
+
+          return res.status(400).json({
+            message: `Reference solution failed on testcase ${i + 1}`,
+            testcase: allTestcases[i],
+            result: submitResults[i]
+          });
+
+        }
+      }
+    }
+
+
+    const updatedProblem = await Problem.findByIdAndUpdate(
+      id,
+      {
+        title,
+        description,
+        difficulty,
+        tags,
+        visibletestcases,
+        hiddentestcases,
+        referenceSolution: filteredReference
+      },
+      { runValidators: true, new: true }
+    );
+
+
+    res.status(200).json(updatedProblem);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+
+const deleteProblem = async (req, res) => {
+
+  const { id } = req.params;
+
+  try {
+
+    const problem = await Problem.findByIdAndDelete(id);
+
+    if (!problem) {
+      return res.status(404).json({ message: "Problem not found" });
+    }
+
+    res.json({ message: "Problem deleted" });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+
+const getProblemById = async (req, res) => {
+
+  try {
+
+    const problem = await Problem.findById(req.params.id)
+      .select("_id title description difficulty tags visibletestcases problemCreator starterCode")
+
+    if (!problem) {
+      return res.status(404).json({ message: "Problem not found" });
+    }
+
+    res.json(problem);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+
+const getAllProblems = async (req, res) => {
+
+  try {
+
+    const problems = await Problem.find({})
+      .select("_id title description difficulty tags");
+
+    if (problems.length === 0) {
+      return res.status(404).json({ message: "No problems found" });
+    }
+
+    res.status(200).send(problems);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+
+const solvedProblemsbyUser = async (req, res) => {
+
+  try {
+
+   const userId = req.user?._id;
+
+    const user = await User.findById(userId)
+      .populate({
+        path: "problemsSolved",
+        select: "_id title description difficulty tags"
+      });
+
+    res.status(200).send(user.problemsSolved);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+
+/* =========================
+   FIXED SUBMISSIONS API
+   ========================= */
+
+const submittedProblemsbyUser = async (req, res) => {
+  try {
+
+    const userId = req.result?._id;
+    const problemId = req.params.pid;
+
+    const submissions = await Submission.find({
+  userId: userId,
+  problemId: problemId
+}).sort({ createdAt: -1 });
+
+    const totalSubmissions = submissions.length;
+
+    const acceptedSubmissions = submissions.filter(
+      sub => sub.status === "Accepted"
+    ).length;
+
+    const acceptanceRate =
+      totalSubmissions === 0
+        ? 0
+        : ((acceptedSubmissions / totalSubmissions) * 100).toFixed(2);
+
+    res.status(200).json({
+      totalSubmissions,
+      acceptedSubmissions,
+      acceptanceRate,
+      submissions
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+
+  }
+};
+
+
+
+
+module.exports = {
+  createProblem,
+  updateProblem,
+  deleteProblem,
+  getProblemById,
+  getAllProblems,
+  solvedProblemsbyUser,
+  submittedProblemsbyUser
+};
+
+================================================================================
+FILE: Backend\src\controllers\usersubmission.js
+================================================================================
+
+// Filename: src/controllers/usersubmission.js
+const Problem = require("../models/problem");
+const { submitBatch, getLanguageId } = require("../services/languageService");
+const Submission = require("../models/submissions");
+const User = require("../models/user");
+const ContestBan = require("../models/contestBan");
+
+const cleanError = (err) => {
+  if (!err) return "";
+  const lines = err.split("\n");
+  let lineNumber = "";
+  let codeLine = "";
+  let message = "";
+  for (let line of lines) {
+    if (line.includes("main.cpp:") && line.includes("error:")) {
+      const match = line.match(/main\.cpp:(\d+):/);
+      if (match) lineNumber = match[1];
+      message = line.split("error:")[1]?.trim() || "";
+    }
+    const codeMatch = line.match(/^\s*\d+\s*\|\s*(.*)/);
+    if (codeMatch && !codeLine) {
+      const candidate = codeMatch[1].trim();
+      if (!candidate.includes("operator>") && !candidate.includes("std::") && !candidate.includes("noexcept")) {
+        codeLine = candidate;
+      }
+    }
+  }
+  let finalMsg = "Compilation Error:\n";
+  if (lineNumber) finalMsg += `Line ${lineNumber}: `;
+  if (codeLine) finalMsg += `${codeLine}\n`;
+  if (message) finalMsg += `${message}\n`;
+  if (codeLine.includes("cin >")) finalMsg += "Hint: Did you mean 'cin >> n' ?";
+  if (codeLine.includes("cout <")) finalMsg += "Hint: Did you mean 'cout <<' ?";
+  return finalMsg;
+};
+
+const normalize = (str) => (str || "").toString().replace(/\r/g, "").trim();
+
+/* =========================
+   RUN CODE
+========================= */
+const runCode = async (req, res) => {
+  try {
+    const problemId = req.params.id;
+    const { code, language } = req.body;
+
+    const problem = await Problem.findById(problemId)
+      .select("_id visibletestcases hiddentestcases driverCode starterCode");
+
+    if (!problem) {
+      return res.status(404).json({ success: false, error: "Problem not found" });
+    }
+
+    const languageId = await getLanguageId(language);
+
+    // â”€â”€ Append driver code â”€â”€
+    const driverCode = problem.driverCode?.find(d => d.language === language)?.code || "";
+    const finalCode = driverCode ? code + "\n\n" + driverCode : code;
+
+    const testcases = problem.visibletestcases || [];
+
+    const submissions = testcases.map((tc) => ({
+      source_code: finalCode,
+      language_id: languageId,
+      stdin: tc.input,
+    }));
+
+    const results = await submitBatch(submissions);
+
+    const formatted = results.map((r, i) => {
+      let output = "";
+      let errorType = "";
+
+      if (r.compile_output) {
+        output = cleanError(r.compile_output);
+        errorType = "Compilation Error";
+      } else if (r.stderr) {
+        output = r.stderr;
+        errorType = "Runtime Error";
+      } else if (r.status.id === 3) {
+        output = r.stdout;
+        errorType = "Accepted";
+      }
+
+      const actual = normalize(output);
+      const expected = normalize(testcases[i]?.output);
+
+      return {
+        input: testcases[i]?.input || "",
+        expectedOutput: testcases[i]?.output || "",
+        actualOutput: actual,
+        errorType,
+        passed: actual === expected && errorType === "Accepted",
+      };
+    });
+
+    return res.json({
+      success: true,
+      results: formatted,
+      verdict: formatted.every((r) => r.passed) ? "Accepted" : "Wrong Answer",
+      passedCount: formatted.filter(r => r.passed).length,
+      total: formatted.length,
+    });
+
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+/* =========================
+   SUBMIT CODE
+========================= */
+const Leaderboard = require("../models/leaderboard");
+
+const submitSolution = async (req, res) => {
+  // Ban check karo
+
+
+// submitSolution function ke andar, problemId ke baad
+
+  try {
+    console.log("ðŸ”¥ submitSolution HIT");
+
+    const userId = req.user._id;
+    const problemId = req.params.id;
+    const { code, language, contestId } = req.body;
+    // â”€â”€ Ban Check â”€â”€
+if (contestId) {
+  const ban = await ContestBan.findOne({ userId, contestId });
+  if (ban) {
+    return res.status(403).json({
+      success: false,
+      message: "You are banned from this contest due to tab switching",
+      isBanned: true,
+    });
+  }
+}
+
+    const problem = await Problem.findById(problemId)
+      .select("_id visibletestcases hiddentestcases driverCode starterCode difficulty");
+
+    if (!problem) {
+      return res.status(404).json({ message: "Problem not found" });
+    }
+
+    const languageId = await getLanguageId(language);
+
+    // â”€â”€ Append driver code â”€â”€
+    const driverCode = problem.driverCode?.find(d => d.language === language)?.code || "";
+    const finalCode = driverCode ? code + "\n\n" + driverCode : code;
+
+    const allTestcases = [
+      ...(problem.visibletestcases || []),
+      ...(problem.hiddentestcases || []),
+    ];
+
+    const submissions = allTestcases.map((tc) => ({
+      source_code: finalCode,
+      language_id: languageId,
+      stdin: tc.input,
+    }));
+
+    const results = await submitBatch(submissions);
+
+    let passed = 0;
+    const detailedResults = [];
+
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      let output = "";
+
+      if (r.status.id === 3) {
+        output = r.stdout;
+      } else if (r.compile_output) {
+        output = cleanError(r.compile_output);
+      } else if (r.stderr) {
+        output = r.stderr;
+      }
+
+      const actual = normalize(output);
+      const expected = normalize(allTestcases[i].output);
+      const isPassed = actual === expected && r.status.id === 3;
+
+      if (isPassed) passed++;
+
+      let errorType = "";
+      if (r.status.id === 3) errorType = "Accepted";
+      else if (r.compile_output) errorType = "Compilation Error";
+      else if (r.stderr) errorType = "Runtime Error";
+      else errorType = "Error";
+
+      detailedResults.push({
+        input: allTestcases[i].input,
+        expectedOutput: allTestcases[i].output,
+        actualOutput: actual,
+        errorType,
+        passed: isPassed,
+      });
+    }
+
+    const total = allTestcases.length;
+    const finalStatus = passed === total ? "Accepted" : "Wrong Answer";
+
+    const submission = await Submission.create({
+      userId,
+      problemId,
+      contestId: contestId || null,
+      language,
+      code,
+      status: finalStatus,
+      testcasesPassed: passed,
+      totalTestcases: total,
+    });
+
+    await User.findByIdAndUpdate(userId, {
+      $inc: { "stats.totalSubmissions": 1 },
+    });
+
+    if (finalStatus === "Accepted") {
+      const user = await User.findById(userId);
+
+      const alreadySolvedUser = user.problemsSolved.some(
+        (pid) => pid.toString() === problemId.toString()
+      );
+
+      await User.findByIdAndUpdate(userId, {
+        $inc: { "stats.acceptedSubmissions": 1 },
+      });
+
+      if (!alreadySolvedUser) {
+        await User.findByIdAndUpdate(userId, {
+          $addToSet: { problemsSolved: problemId },
+          $inc: { "stats.totalSolved": 1 },
+        });
+      }
+
+      // ðŸ”¥ðŸ”¥ðŸ”¥ LEADERBOARD FIX START ðŸ”¥ðŸ”¥ðŸ”¥
+      if (contestId) {
+        const scoreMap = {
+          easy: 100,
+          medium: 200,
+          hard: 300,
+        };
+
+        const score =
+          scoreMap[problem.difficulty?.toLowerCase()] || 0;
+
+        let entry = await Leaderboard.findOne({
+          contestId,
+          userId,
+        });
+
+        if (!entry) {
+          entry = await Leaderboard.create({
+            contestId,
+            userId,
+            score: 0,
+            solvedCount: 0,
+            solvedProblems: [],
+          });
+        }
+
+        const alreadySolved = entry.solvedProblems.some(
+          (p) => p.toString() === problemId.toString()
+        );
+
+        console.log("Already Solved (LB):", alreadySolved);
+
+        if (!alreadySolved) {
+          entry.solvedProblems.push(problemId);
+          entry.score += score;
+          entry.solvedCount += 1;
+        }
+
+        await entry.save();
+      }
+      // ðŸ”¥ðŸ”¥ðŸ”¥ LEADERBOARD FIX END ðŸ”¥ðŸ”¥ðŸ”¥
+    }
+
+    return res.status(200).json({
+      status: finalStatus,
+      verdict: finalStatus,
+      passed,
+      passedCount: passed,
+      total,
+      submission,
+      results: detailedResults,
+    });
+
+  } catch (error) {
+    console.log("SUBMIT ERROR:", error);
+    return res.status(500).json({ message: "Submission failed", error: error.message });
+  }
+};
+
+module.exports = { runCode, submitSolution };
+
+================================================================================
+FILE: Backend\src\middleware\adminmiddleware.js
+================================================================================
+
+// Filename: src/middleware/adminmiddleware.js
+const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+
+const adminmiddleware = async (req, res, next) => {
+  try {
+    const { token } = req.cookies;
+
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+    if (!payload?._id) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const user = await User.findById(payload._id);
+
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    if (user.role !== "admin") {
+      return res.status(403).json({ error: "Admins only" });
+    }
+
+    req.user = user; // ONLY ONE SOURCE OF TRUTH
+    next();
+
+  } catch (err) {
+    return res.status(401).json({ error: err.message });
+  }
+};
+
+module.exports = adminmiddleware;
+
+================================================================================
+FILE: Backend\src\middleware\userMiddleware.js
+================================================================================
+
+const userMiddleware = async (req, res, next) => {
+    try {
+        console.log("COOKIES:", req.cookies); // ðŸ”¥ debug
+
+        const token = req.cookies?.token;
+
+        if (!token) {
+            return res.status(401).json({ error: "No token found" });
+        }
+
+        const payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+        const user = await User.findById(payload._id);
+
+        if (!user) {
+            return res.status(401).json({ error: "User not found" });
+        }
+
+        req.user = user;
+        next();
+
+    } catch (error) {
+        return res.status(401).json({ error: "Invalid token" });
+    }
+};
+
+================================================================================
+FILE: Backend\src\models\contest.js
+================================================================================
+
+// Filename: src/models/contest.js
+const mongoose = require("mongoose");
+
+const contestSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    description: String,
+
+    // ðŸ”¥ SINGLE SOURCE OF TRUTH
+    startTime: { type: Date, required: true },
+    duration: { type: Number, required: true }, // in minutes
+
+    problems: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Problem",
+      },
+    ],
+
+    organizers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+        // â”€â”€ NEW â”€â”€
+    tabSwitchBanEnabled: {
+      type: Boolean,
+      default: false,
+    },
+
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Contest", contestSchema);
+
+================================================================================
+FILE: Backend\src\models\contestAdminRequest.js
+================================================================================
+
+// Filename: src/models/contestAdminRequest.js
+const mongoose = require("mongoose");
+
+const requestSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    contestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contest",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("ContestAdminRequest", requestSchema);
+
+================================================================================
+FILE: Backend\src\models\contestBan.js
+================================================================================
+
+// Filename: src/models/contestBan.js
+const mongoose = require("mongoose");
+
+const contestBanSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    contestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contest",
+      required: true,
+    },
+    reason: {
+      type: String,
+      default: "Tab switch detected",
+    },
+    tabSwitchCount: {
+      type: Number,
+      default: 1,
+    },
+  },
+  { timestamps: true }
+);
+
+// Unique index â€” ek user ek contest mein sirf ek ban entry
+contestBanSchema.index({ userId: 1, contestId: 1 }, { unique: true });
+
+module.exports = mongoose.model("ContestBan", contestBanSchema);
+
+================================================================================
+FILE: Backend\src\models\leaderboard.js
+================================================================================
+
+// Filename: src/models/leaderboard.js
+const mongoose = require("mongoose");
+
+const leaderboardSchema = new mongoose.Schema(
+  {
+    contestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contest",
+    },
+
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    solvedProblems: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Problem"
+  }
+],
+
+    score: {
+      type: Number,
+      default: 0,
+    },
+
+    solvedCount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Leaderboard", leaderboardSchema);
+
+================================================================================
+FILE: Backend\src\models\problem.js
+================================================================================
+
+// Filename: src/models/problem.js
+const mongoose = require('mongoose');
+
+const testcaseSchema = new mongoose.Schema({
+  input: {
+    type: String,
+    required: true
+  },
+  output: {
+    type: String,
+    required: true
+  }
+});
+
+const solutionSchema = new mongoose.Schema({
+  language: {
+    type: String,
+    required: true
+  },
+  completeCode: {
+    type: String,
+    required: true
+  }
+});
+
+
+
+const problemSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  contestId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Contest",
+  default: null,
+},
+  description: {
+    type: String,
+    required: true
+  },
+  difficulty: {
+    type: String,
+    enum: ['Easy', 'Medium', 'Hard'],
+    required: true
+  },
+  tags: [{
+    type: String,
+    trim: true
+  }],
+  visibletestcases: [testcaseSchema],
+  hiddentestcases: [testcaseSchema],
+  referenceSolution: [solutionSchema],
+
+    starterCode: [
+    {
+      language: String,
+      intialCode: String
+    }
+  ],
+
+  driverCode: [
+    {
+      language: String,
+      code: String
+    }
+  ],
+
+
+  problemCreator: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
+}, {
+  timestamps: true
+});
+
+const Problem = mongoose.model('Problem', problemSchema);
+
+module.exports = Problem;
+
+
+
+================================================================================
+FILE: Backend\src\models\submissions.js
+================================================================================
+
+// Filename: src/models/submissions.js
+const mongoose = require("mongoose");
+
+const submissionSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    problemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Problem",
+      required: true,
+    },
+
+    contestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contest",
+      default: null,
+    },
+
+    language: {
+      type: String,
+      required: true,
+    },
+
+    code: {
+      type: String,
+      required: true,
+    },
+
+    status: {
+      type: String,
+      default: "Wrong Answer",
+    },
+
+    testcasesPassed: {
+      type: Number,
+      default: 0,
+    },
+
+    totalTestcases: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Submission", submissionSchema);
+
+================================================================================
+FILE: Backend\src\models\user.js
+================================================================================
+
+// Filename: src/models/user.js
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
+
+const userSchema = new Schema({
+    firstName: {
+        type: String,
+        required: true,
+        minlength: 3,
+        maxlength: 30
+    },
+    LastName: {
+        type: String,
+        minlength: 3,
+        maxlength: 30
+    },
+    emailId: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true,
+        immutable: true
+    },
+    role: {
+        type: String,
+        enum: ["admin", "user"],
+        default: "user"
+    },
+    stats: {
+  totalSubmissions: { type: Number, default: 0 },
+  acceptedSubmissions: { type: Number, default: 0 },
+  totalSolved: { type: Number, default: 0 }
+},
+   problemsSolved: {
+  type: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Problem'
+  }],
+  default: []
+},
+    password: {
+        type: String,
+        required: true
+    }
+}, {
+    timestamps: true
+});
+
+const User = mongoose.model("User", userSchema);
+
+module.exports = User;
+
+================================================================================
+FILE: Backend\src\routes\auth.js
+================================================================================
+
+const express = require("express");
+const router = express.Router();
+const { OAuth2Client } = require("google-auth-library");
+const jwt = require("jsonwebtoken");
+const User = require("../models/user");
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+router.post("/google", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Token missing" });
+    }
+
+    // 1. VERIFY GOOGLE TOKEN
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    const { email, name, picture, sub } = payload;
+
+    // 2. FIND USER
+    let user = await User.findOne({ email });
+
+    // 3. CREATE IF NOT EXISTS
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        avatar: picture,
+        googleId: sub,
+        password: "", // google users
+      });
+    }
+
+    // 4. CREATE JWT
+    const authToken = jwt.sign(
+      { id: user._id, role: user.role, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // 5. RESPONSE
+    res.json({
+      token: authToken,
+      user,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Google auth failed" });
+  }
+});
+
+module.exports = router;
+
+================================================================================
+FILE: Backend\src\routes\contestRoutes.js
+================================================================================
+
+const express = require("express");
+const router = express.Router();
+
+const { createContest, getAllContests, getContestById, deleteContest } = require("../controllers/contestController");
+const { banUser, checkBanStatus, getBannedUsers } = require("../controllers/contestBanController");
+const userMiddleware = require("../middleware/userMiddleware");
+const adminMiddleware = require("../middleware/adminmiddleware");
+
+// ADMIN ONLY
+router.post("/create", userMiddleware, adminMiddleware, createContest);
+router.delete("/:id", userMiddleware, adminMiddleware, deleteContest);
+
+// â”€â”€ BAN ROUTES â€” pehle rakho /:id se â”€â”€
+router.post("/ban/tabswitch", userMiddleware, banUser);
+router.get("/ban/status/:contestId", userMiddleware, checkBanStatus);
+router.get("/ban/all/:contestId", userMiddleware, getBannedUsers);
+
+// â”€â”€ GENERAL â€” baad mein â”€â”€
+router.get("/", userMiddleware, getAllContests);
+router.get("/:id", userMiddleware, getContestById);
+
+module.exports = router;
+
+================================================================================
+FILE: Backend\src\routes\leaderboardRoutes.js
+================================================================================
+
+const express = require("express");
+const router = express.Router();
+
+const { getContestLeaderboard } = require("../controllers/leaderboardController");
+const userMiddleware = require("../middleware/userMiddleware");
+
+// Both admin and user can access
+router.get("/:contestId", userMiddleware, getContestLeaderboard);
+
+module.exports = router;
+
+================================================================================
+FILE: Backend\src\routes\problemCreator.js
+================================================================================
+
+// Filename: src/routes/problemCreator.js
+// this is problemCreator.js - the router for handling all problem-related routes, including admin routes for creating, updating and deleting problems, and user routes for retrieving problems and user-specific problem data
+
+const express = require("express");
+const router = express.Router();
+
+const adminmiddleware = require("../middleware/adminmiddleware");
+const userMiddleware = require("../middleware/userMiddleware");
+
+const {
+  createProblem,
+  updateProblem,
+  deleteProblem,
+  getProblemById,
+  getAllProblems,
+  solvedProblemsbyUser,
+  submittedProblemsbyUser,
+} = require("../controllers/userProblem");
+
+const {
+  runCode,
+  submitSolution
+} = require("../controllers/usersubmission");
+
+/* ADMIN */
+router.post("/create", adminmiddleware, createProblem);
+router.put("/update/:id", adminmiddleware, updateProblem);
+router.delete("/delete/:id", adminmiddleware, deleteProblem);
+
+/* PROBLEMS */
+router.get("/getallproblems", getAllProblems);
+router.get("/problembyid/:id", getProblemById);
+
+/* USER */
+router.get("/problemsolvedbyuser/solved", userMiddleware, solvedProblemsbyUser);
+router.get("/submittedproblems/:pid", userMiddleware, submittedProblemsbyUser);
+
+/* CODE */
+router.post("/run/:id", userMiddleware, runCode);
+router.post("/submit/:id", userMiddleware, submitSolution);
+
+module.exports = router;// this is submit.js - the router for handling code submission requests from the frontend, which includes the /submit/:id route that accepts POST requests with the user's code and language, and calls the submitSolution controller to execute the code and return the results
+
+
+
+
+
+
+/* =========================
+   SUBMIT ROUTE
+========================= */
+
+module.exports = router;
+
+
+================================================================================
+FILE: Backend\src\routes\submit.js
+================================================================================
+
+// Filename: src/routes/submit.js
+const express = require("express");
+const router = express.Router();
+
+const userMiddleware = require("../middleware/userMiddleware");
+
+const { runCode, submitSolution } = require("../controllers/usersubmission");
+
+router.post("/run/:id", userMiddleware, runCode);
+router.post("/submit/:id", userMiddleware, submitSolution);
+
+module.exports = router;
+
+================================================================================
+FILE: Backend\src\routes\userAuth.js
+================================================================================
+
+// Filename: src/routes/userAuth.js
+
+const express = require('express');
+const authRouter = express.Router();
+
+// controllers (SAFE IMPORT - no destructuring)
+const userController = require('../controllers/userAuthent');
+
+// middleware
+const userMiddleware = require('../middleware/userMiddleware');
+const adminmiddleware = require('../middleware/adminmiddleware');
+
+
+// ðŸ”¥ DEBUG (Render pe confirm karega function load ho raha hai ya nahi)
+console.log("deleteProfile check:", typeof userController.deleteProfile);
+
+
+// =======================
+// AUTH ROUTES
+// =======================
+
+// register
+authRouter.post("/register", userController.register);
+
+// login
+authRouter.post("/login", userController.login);
+
+// logout
+authRouter.post("/logout", userController.logout);
+
+// admin register
+authRouter.post("/admin/register", adminmiddleware, userController.adminRegister);
+
+
+// =======================
+// DELETE PROFILE ROUTE
+// =======================
+authRouter.delete(
+  "/deleteprofile",
+  userMiddleware,
+  userController.deleteProfile
+);
+
+
+// =======================
+// AUTH CHECK ROUTE
+// =======================
+authRouter.get("/check-auth", userMiddleware, (req, res) => {
+    const reply = {
+        firstName: req.user.firstName,
+        email: req.user.email,
+        _id: req.user._id,
+        role: req.user.role
+    };
+
+    res.status(200).json({
+        reply,
+        message: "User is authenticated"
+    });
+});
+
+
+// export router
+module.exports = authRouter;
+
+================================================================================
+FILE: Backend\src\services\languageService.js
+================================================================================
+
+// Filename: src/services/languageService.js
+const axios = require("axios");
+
+/* =========================
+   LANGUAGE MAP (FIXED + SAFE)
+========================= */
+const LANGUAGE_MAP = {
+  javascript: 63,
+  js: 63,
+
+  python: 71,
+
+  java: 62,
+
+  "c++": 54,
+  cpp: 54, // ðŸ”¥ FIX: IMPORTANT
+};
+
+/* =========================
+   JUDGE0 CONFIG
+========================= */
+const JUDGE0_URL = process.env.JUDGE0_URL || "http://localhost:2358";
+
+/* =========================
+   LANGUAGE RESOLVER (FIXED)
+========================= */
+const getLanguageId = async (language) => {
+  if (!language) {
+    throw new Error("Language is required");
+  }
+
+  const normalized = language.toLowerCase();
+
+  console.log("LANGUAGE REQUESTED:", normalized);
+
+  const langId = LANGUAGE_MAP[normalized];
+
+  if (!langId) {
+    throw new Error("Unsupported language: " + language);
+  }
+
+  return langId;
+};
+
+/* =========================
+   UTIL
+========================= */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* =========================
+   SUBMIT BATCH (JUDGE0)
+========================= */
+const submitBatch = async (submissions) => {
+  try {
+    console.log("ðŸ”¥ Sending to Judge0...");
+
+    // encode base64
+    const encodedSubmissions = submissions.map((s) => ({
+      source_code: Buffer.from(s.source_code || "").toString("base64"),
+      language_id: s.language_id,
+      stdin: Buffer.from(s.stdin || "").toString("base64"),
+    }));
+
+    console.log("ðŸ“¦ Encoded submissions ready:", encodedSubmissions.length);
+
+    const response = await axios.post(
+      `${JUDGE0_URL}/submissions/batch?base64_encoded=true`,
+      { submissions: encodedSubmissions }
+    );
+
+    const tokens = response.data.map((t) => t.token);
+    const tokenString = tokens.join(",");
+
+    let results = [];
+    let attempts = 0;
+
+    const MAX_ATTEMPTS = 25;
+    const TIMEOUT_MS = 25000;
+    const start = Date.now();
+
+    while (attempts < MAX_ATTEMPTS) {
+      if (Date.now() - start > TIMEOUT_MS) {
+        throw new Error("Judge0 timeout: execution too slow");
+      }
+
+      await sleep(1000);
+
+      const res = await axios.get(
+        `${JUDGE0_URL}/submissions/batch?tokens=${tokenString}&base64_encoded=true`
+      );
+
+      results = res.data.submissions.map((r, i) => ({
+        token: tokens[i],
+
+        stdout: r.stdout
+          ? Buffer.from(r.stdout, "base64").toString()
+          : "",
+
+        stderr: r.stderr
+          ? Buffer.from(r.stderr, "base64").toString()
+          : "",
+
+        compile_output: r.compile_output
+          ? Buffer.from(r.compile_output, "base64").toString()
+          : "",
+
+        status: r.status,
+      }));
+
+      const allDone = results.every((r) => r.status?.id >= 3);
+
+      if (allDone) break;
+
+      attempts++;
+    }
+
+    if (!results || results.length === 0) {
+      throw new Error("Judge0 returned empty response");
+    }
+
+    console.log("âœ… Judge0 execution completed");
+
+    return results;
+  } catch (err) {
+    console.log("âŒ JUDGE0 ERROR:", err.message);
+    throw err;
+  }
+};
+
+module.exports = {
+  getLanguageId,
+  submitBatch,
+};
+
+================================================================================
+FILE: Backend\src\socket\contestSocket.js
+================================================================================
+
+const violations = {}; // userId -> count
+
+const initContestSocket = (io) => {
+  io.on("connection", (socket) => {
+
+    console.log("User connected:", socket.id);
+
+    // JOIN CONTEST
+    socket.on("joinContest", ({ contestId, userId }) => {
+     socket.join(contestId.toString());
+      console.log(`User ${userId} joined contest ${contestId}`);
+    });
+
+    // TAB SWITCH DETECT
+    socket.on("tabSwitch", ({ contestId, userId }) => {
+      if (!violations[userId]) {
+        violations[userId] = 0;
+      }
+
+      violations[userId]++;
+
+      console.log(`User ${userId} violations:`, violations[userId]);
+
+      // BROADCAST TO ALL IN CONTEST
+     io.to(contestId.toString()).emit("violationUpdate", {
+  userId,
+  count: violations[userId],
+});
+    });
+
+  });
+};
+
+module.exports = initContestSocket;
+
+================================================================================
+FILE: Backend\src\utils\contestHelper.js
+================================================================================
+
+// Filename: src/utils/contestHelper.js
+const { isContestLive } = require("../utils/contestHelper");
+
+const getContestById = async (req, res) => {
+  const contest = await Contest.findById(req.params.id);
+
+  res.json({
+    contest,
+    isLive: isContestLive(contest),
+  });
+};
+
+================================================================================
+FILE: Backend\src\utils\problemutility.js
+================================================================================
+
+// Filename: src/utils/problemutility.js
+const axios = require('axios');
+
+const getLanguageId=(lang)=>{
+    const language={
+        'JavaScript': 63,
+        'Python': 71,
+        'Java': 62,
+        'C++': 54
+    }
+    return language[lang.toLowerCase()];
+}
+
+const submitBatch = async (submissions) => {
+  try {
+    const url = 'http://localhost:2358/submissions/batch?base64_encoded=false&wait=true';
+
+    const data = {
+      submissions: submissions.map(sub => ({
+        language_id: sub.language_id,
+        source_code: sub.source_code,
+        stdin: sub.stdin || ''
+      }))
+    };
+
+    const response = await axios.post(url, data, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data;
+
+  } catch (error) {
+    console.error('Batch submission error:', error.response?.data || error.message);
+    return null;
+  }
+};
+
+module.exports={getLanguageId, submitBatch}
+
+================================================================================
+FILE: Backend\src\utils\validator.js
+================================================================================
+
+// Filename: src/utils/validator.js
+const validator = require('validator');
+
+const validate = (data)=>{
+    const mandatoryFields = ['firstName', 'emailId', 'password'];
+    const IsAllowed = mandatoryFields.every((k)=>Object.keys(data).includes(k));
+    if(!IsAllowed){
+        throw new Error("Missing mandatory fields: firstName, emailId, password");
+    }
+    if(!validator.isEmail(data.emailId)){
+        throw new Error("Invalid email format");
+    }
+    if(!validator.isStrongPassword(data.password)){
+        throw new Error("Password is not strong enough");
+    }
+}
+
+module.exports = validate;
+
+================================================================================
+FILE: Frontend\.gitignore
+================================================================================
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+================================================================================
+FILE: Frontend\eslint.config.js
+================================================================================
+
+// Filename: Frontend/eslint.config.js
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{js,jsx}'],
+    extends: [
+      js.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+    },
+  },
+])
+
+
+================================================================================
+FILE: Frontend\index.html
+================================================================================
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+
+================================================================================
+FILE: Frontend\package.json
+================================================================================
+
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@monaco-editor/react": "^4.7.0",
+    "@react-oauth/google": "^0.13.5",
+    "@reduxjs/toolkit": "^2.11.2",
+    "@tailwindcss/vite": "^4.2.2",
+    "axios": "^1.14.0",
+    "daisyui": "^5.5.19",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-hook-form": "^7.72.1",
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^7.14.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "vite": "^8.0.1"
+  }
+}
+
+
+================================================================================
+FILE: Frontend\README.md
+================================================================================
+
+# React + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+
+================================================================================
+FILE: Frontend\vite.config.js
+================================================================================
+
+// Filename: Frontend/vite.config.js
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
+  },
+
+  plugins: [react(), tailwindcss()],
+})
+
+================================================================================
+FILE: Frontend\src\App.css
+================================================================================
+
+/* Filename: Frontend/src/App.css */
+.counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+  margin-bottom: 24px;
+
+  &:hover {
+    border-color: var(--accent-border);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+.hero {
+  position: relative;
+
+  .base,
+  .framework,
+  .vite {
+    inset-inline: 0;
+    margin: 0 auto;
+  }
+
+  .base {
+    width: 170px;
+    position: relative;
+    z-index: 0;
+  }
+
+  .framework,
+  .vite {
+    position: absolute;
+  }
+
+  .framework {
+    z-index: 1;
+    top: 34px;
+    height: 28px;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
+      scale(1.4);
+  }
+
+  .vite {
+    z-index: 0;
+    top: 107px;
+    height: 26px;
+    width: auto;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
+      scale(0.8);
+  }
+}
+
+#center {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  place-content: center;
+  place-items: center;
+  flex-grow: 1;
+
+  @media (max-width: 1024px) {
+    padding: 32px 20px 24px;
+    gap: 18px;
+  }
+}
+
+#next-steps {
+  display: flex;
+  border-top: 1px solid var(--border);
+  text-align: left;
+
+  & > div {
+    flex: 1 1 0;
+    padding: 32px;
+    @media (max-width: 1024px) {
+      padding: 24px 20px;
+    }
+  }
+
+  .icon {
+    margin-bottom: 16px;
+    width: 22px;
+    height: 22px;
+  }
+
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+#docs {
+  border-right: 1px solid var(--border);
+
+  @media (max-width: 1024px) {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+#next-steps ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  margin: 32px 0 0;
+
+  .logo {
+    height: 18px;
+  }
+
+  a {
+    color: var(--text-h);
+    font-size: 16px;
+    border-radius: 6px;
+    background: var(--social-bg);
+    display: flex;
+    padding: 6px 12px;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: box-shadow 0.3s;
+
+    &:hover {
+      box-shadow: var(--shadow);
+    }
+    .button-icon {
+      height: 18px;
+      width: 18px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+
+    li {
+      flex: 1 1 calc(50% - 8px);
+    }
+
+    a {
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+  }
+}
+
+#spacer {
+  height: 88px;
+  border-top: 1px solid var(--border);
+  @media (max-width: 1024px) {
+    height: 48px;
+  }
+}
+
+.ticks {
+  position: relative;
+  width: 100%;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: -4.5px;
+    border: 5px solid transparent;
+  }
+
+  &::before {
+    left: 0;
+    border-left-color: var(--border);
+  }
+  &::after {
+    right: 0;
+    border-right-color: var(--border);
+  }
+}
+
+
+================================================================================
+FILE: Frontend\src\App.jsx
+================================================================================
+
+import { Routes, Route, Navigate } from "react-router-dom";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import { useDispatch, useSelector } from "react-redux";
+import { useEffect } from "react";
+
+import Homepage from "./pages/Homepage";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import AdminPanel from "./pages/AdminPanel";
+import ProblemPage from "./pages/ProblemPage";
+import Leaderboard from "./pages/Leaderboard";
+import ContestList from "./pages/ContestList";
+import ContestPage from "./pages/ContestPage";
+import CreateContest from "./pages/CreateContest";
+import { checkAuth } from "./authslice";
+
+// â”€â”€ Protected Route â”€â”€
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useSelector((state) => state.auth);
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#1e2330]">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+    </div>
+  );
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
+
+// â”€â”€ Admin Route â”€â”€
+const AdminRoute = ({ children }) => {
+  const { isAuthenticated, loading, user } = useSelector((state) => state.auth);
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#1e2330]">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+    </div>
+  );
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role !== "admin") return <Navigate to="/" replace />;
+  return children;
+};
+
+function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(checkAuth());
+  }, [dispatch]);
+
+  return (
+    <GoogleOAuthProvider clientId="119229563975-rg28o97on0qc4k68uu7j9jufcbentusl.apps.googleusercontent.com">
+      <Routes>
+
+        {/* â”€â”€ PUBLIC â”€â”€ */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+
+        {/* â”€â”€ PROTECTED â”€â”€ */}
+        <Route path="/" element={<ProtectedRoute><Homepage /></ProtectedRoute>} />
+        <Route path="/problems/:pid" element={<ProtectedRoute><ProblemPage /></ProtectedRoute>} />
+        <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+        <Route path="/contests" element={<ProtectedRoute><ContestList /></ProtectedRoute>} />
+        <Route path="/contest/:id" element={<ProtectedRoute><ContestPage /></ProtectedRoute>} />
+
+        {/* â”€â”€ ADMIN ONLY â”€â”€ */}
+        <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+        <Route path="/admin/contest" element={<AdminRoute><CreateContest /></AdminRoute>} />
+
+      </Routes>
+    </GoogleOAuthProvider>
+  );
+}
+
+export default App;
+
+================================================================================
+FILE: Frontend\src\authslice.js
+================================================================================
+
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import axiosClient from "./utils/axiosClient";
+
+/* REGISTER */
+export const registerUser = createAsyncThunk(
+  "auth/register",
+  async (userData, { rejectWithValue }) => {
+    try {
+      const response = await axiosClient.post("/user/register", userData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+        error.message ||
+        "Registration failed"
+      );
+    }
+  }
+);
+
+/* LOGIN */
+export const loginUser = createAsyncThunk(
+  "auth/login",
+  async (credentials, { rejectWithValue }) => {
+    try {
+      const response = await axiosClient.post("/user/login", credentials);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed"
+      );
+    }
+  }
+);
+
+/* CHECK AUTH */
+export const checkAuth = createAsyncThunk(
+  "auth/checkAuth",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axiosClient.get("/user/check-auth");
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(null);
+    }
+  }
+);
+
+/* LOGOUT */
+export const logoutUser = createAsyncThunk(
+  "auth/logout",
+  async (_, { rejectWithValue }) => {
+    try {
+      await axiosClient.post("/user/logout");
+      return null;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+        error.message ||
+        "Logout failed"
+      );
+    }
+  }
+);
+
+const authSlice = createSlice({
+  name: "auth",
+  initialState: {
+    user: null,
+    isAuthenticated: false,
+    loading: true,
+    error: null,
+  },
+
+  reducers: {
+    setUser: (state, action) => {
+      state.user = action.payload?.user || action.payload;
+      state.isAuthenticated = true;
+      state.loading = false;
+      state.error = null;
+    },
+    logoutLocal: (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.loading = false;
+      state.error = null;
+    },
+  },
+
+  extraReducers: (builder) => {
+    builder
+
+      /* REGISTER */
+      .addCase(registerUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.loading = false;
+        const userData = action.payload?.user || action.payload?.reply;
+        state.user = userData;
+        state.isAuthenticated = !!userData;
+      })
+      .addCase(registerUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.isAuthenticated = false;
+      })
+
+      /* LOGIN */
+      .addCase(loginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        const userData = action.payload?.user || action.payload?.reply;
+        state.user = userData;
+        state.isAuthenticated = !!userData;
+      })
+      .addCase(loginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.isAuthenticated = false;
+      })
+
+      /* CHECK AUTH */
+      .addCase(checkAuth.fulfilled, (state, action) => {
+        state.loading = false;
+        const userData = action.payload?.reply || action.payload?.user;
+        if (userData && userData._id) {
+          state.user = userData;
+          state.isAuthenticated = true;
+        } else {
+          state.user = null;
+          state.isAuthenticated = false;
+        }
+      })
+      .addCase(checkAuth.rejected, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+      })
+
+      /* LOGOUT */
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(logoutUser.rejected, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+      });
+  },
+});
+
+export const { setUser, logoutLocal } = authSlice.actions;
+export default authSlice.reducer;
+
+================================================================================
+FILE: Frontend\src\index.css
+================================================================================
+
+/* Filename: Frontend/src/index.css */
+@import "tailwindcss";
+@plugin "daisyui";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: white;
+  color: black;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+================================================================================
+FILE: Frontend\src\main.jsx
+================================================================================
+
+// Filename: Frontend/src/main.jsx
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+import { BrowserRouter } from "react-router-dom";
+import { Provider } from 'react-redux';
+import { store } from './store/store';
+
+createRoot(document.getElementById('root')).render(
+  <Provider store={store}>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </Provider>
+)
+
+================================================================================
+FILE: Frontend\src\socket.js
+================================================================================
+
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000", {
+  withCredentials: true,
+});
+
+socket.on("connect", () => {
+  console.log("Socket connected:", socket.id);
+});
+
+export default socket;
+
+================================================================================
+FILE: Frontend\src\store\store.js
+================================================================================
+
+// Filename: Frontend/src/store/store.js
+import {configureStore} from '@reduxjs/toolkit';
+import authReducer from '../authslice';
+
+export const store = configureStore({
+    reducer: {
+        auth: authReducer,
+    },
+});
+
+================================================================================
+FILE: Frontend\src\utils\axiosClient.js
+================================================================================
+
+import axios from "axios";
+
+const axiosClient = axios.create({
+    baseURL: import.meta.env.VITE_BACKEND_URL,
+    withCredentials: true,
+    headers: {
+        "Content-Type": "application/json",
+    },
+});
+
+export default axiosClient;
+
+================================================================================
+FILE: Frontend\src\utils\contestApi.js
+================================================================================
+
+// Filename: Frontend/src/utils/contestApi.js
+import axiosClient from "./axiosClient";
+
+// GET ALL CONTESTS
+export const getContests = async () => {
+  const res = await axiosClient.get("/contests");
+  return res.data;
+};
+
+// GET SINGLE CONTEST (ðŸ”¥ ADD THIS)
+export const getContest = async (id) => {
+  const res = await axiosClient.get(`/contests/${id}`);
+  return res.data;
+};
+
+================================================================================
+FILE: Frontend\src\components\CodeEditor.jsx
+================================================================================
+
+// Filename: Frontend/src/components/CodeEditor.jsx
+
+
+import Editor from "@monaco-editor/react";
+
+function CodeEditor() {
+  return (
+    <div className="h-full flex flex-col">
+
+      {/* Language Selector */}
+      <div className="flex gap-2 p-2 border-b border-base-300">
+
+        <button className="btn btn-sm btn-primary">
+          JavaScript
+        </button>
+
+        <button className="btn btn-sm btn-ghost">
+          Java
+        </button>
+
+        <button className="btn btn-sm btn-ghost">
+          C++
+        </button>
+
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1">
+        <Editor
+          height="100%"
+          theme="vs-dark"
+          defaultLanguage="javascript"
+          defaultValue="// write your code here"
+        />
+      </div>
+
+      {/* Run Button */}
+      <div className="p-3 border-t border-base-300 flex justify-end">
+
+        <button className="btn btn-success btn-sm">
+          Run Code
+        </button>
+
+      </div>
+
+    </div>
+  );
+}
+
+export default CodeEditor;
+
+================================================================================
+FILE: Frontend\src\components\ProblemDescription.jsx
+================================================================================
+
+// Filename: Frontend/src/components/ProblemDescription.jsx
+function ProblemDescription() {
+  return (
+    <div className="p-6">
+
+      <div className="tabs tabs-boxed mb-4">
+        <a className="tab tab-active">Description</a>
+        <a className="tab">Editorial</a>
+        <a className="tab">Solutions</a>
+        <a className="tab">Submissions</a>
+      </div>
+
+      <h1 className="text-2xl font-bold mb-2">
+        Add Two Numbers
+      </h1>
+
+      <p className="text-gray-400 mb-6">
+        Write a program that takes two integers as input and returns their sum.
+      </p>
+
+      <div className="bg-base-300 p-4 rounded-lg mb-4">
+        <p className="font-semibold">Example 1</p>
+        <pre>Input: 2 3</pre>
+        <pre>Output: 5</pre>
+        <pre>Explanation: 2 + 3 = 5</pre>
+      </div>
+
+      <div className="bg-base-300 p-4 rounded-lg">
+        <p className="font-semibold">Example 2</p>
+        <pre>Input: -1 5</pre>
+        <pre>Output: 4</pre>
+        <pre>Explanation: -1 + 5 = 4</pre>
+      </div>
+
+    </div>
+  );
+}
+
+export default ProblemDescription;
+
+================================================================================
+FILE: Frontend\src\components\TestcasePanel.jsx
+================================================================================
+
+// Filename: Frontend/src/components/TestcasePanel.jsx
+function TestcasePanel() {
+  return (
+    <div className="h-full flex flex-col">
+
+      <div className="tabs tabs-boxed p-2">
+        <a className="tab tab-active">Testcase</a>
+        <a className="tab">Result</a>
+      </div>
+
+      <div className="p-4 text-sm">
+        <pre>2 3</pre>
+      </div>
+
+    </div>
+  );
+}
+
+export default TestcasePanel;
+
+================================================================================
+FILE: Frontend\src\hooks\useAntiCheat.js
+================================================================================
+
+import { useEffect } from "react";
+import socket from "../socket";
+
+const useAntiCheat = ({ contestId, userId, isContestActive }) => {
+  useEffect(() => {
+    const finalUserId = userId?.toString();
+    const finalContestId = contestId?.toString();
+
+    // âŒ Jab tak sab ready nahi hai, kuch mat karo
+    if (!isContestActive || !finalUserId || !finalContestId) {
+      console.log("â›” AntiCheat not active yet", {
+        isContestActive,
+        userId: finalUserId,
+        contestId: finalContestId,
+      });
+      return;
+    }
+
+    console.log("ðŸ›¡ï¸ AntiCheat Active", {
+      contestId: finalContestId,
+      userId: finalUserId,
+    });
+
+    const sendViolation = () => {
+      console.log("ðŸš¨ Tab switch detected:", {
+        contestId: finalContestId,
+        userId: finalUserId,
+      });
+
+      socket.emit("tabSwitch", {
+        contestId: finalContestId,
+        userId: finalUserId,
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        sendViolation();
+      }
+    };
+
+    window.addEventListener("blur", sendViolation);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("blur", sendViolation);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [contestId, userId, isContestActive]);
+};
+
+export default useAntiCheat;
+
+================================================================================
+FILE: Frontend\src\pages\AdminPanel.jsx
+================================================================================
+
+// Filename: Frontend/src/pages/AdminPanel.jsx
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useNavigate } from 'react-router-dom';
+import axiosClient from "../utils/axiosClient";
+
+const problemSchema = z.object({
+  title: z.string().min(5, "Title must be at least 5 characters long"),
+  description: z.string().min(20, "Description must be at least 20 characters long"),
+  difficulty: z.enum(["Easy", "Medium", "Hard"]),
+  tags: z.enum(['Array', 'String', 'Linked List', 'Tree', 'Graph', 'Dynamic Programming', 'Backtracking', 'Greedy', 'Sorting', 'Searching']),
+  visibletestcases: z.array(z.object({
+    input: z.string().min(1, "Input is required"),
+    output: z.string().min(1, "Output is required"),
+    explanation: z.string().min(1, "Explanation is required")
+  })).min(1, "At least one visible test case is required"),
+  hiddentestcases: z.array(z.object({
+    input: z.string().min(1, "Input is required"),
+    output: z.string().min(1, "Output is required")
+  })).min(1, "At least one hidden test case is required"),
+  starterCode: z.array(z.object({
+    language: z.enum(['JavaScript', 'Python', 'Java', 'C++']),
+    intialCode: z.string().optional()
+  })).min(1, "At least one starter code is required"),
+  referenceSolution: z.array(z.object({
+    language: z.enum(['JavaScript', 'Python', 'Java', 'C++']),
+    completeCode: z.string().optional()
+  })).min(1, "At least one reference solution is required"),
+  driverCode: z.array(z.object({
+    language: z.enum(['JavaScript', 'Python', 'Java', 'C++']),
+    code: z.string().optional()
+  })).optional(),
+});
+
+const S = {
+  page:        { minHeight: "100vh", backgroundColor: "#1a1f2e", fontFamily: "sans-serif", padding: "40px 24px" },
+  card:        { maxWidth: "860px", margin: "0 auto", backgroundColor: "#1e2433", borderRadius: "12px", border: "1px solid #2a2f3e", padding: "32px" },
+  heading:     { fontSize: "22px", fontWeight: "700", color: "#f3f4f6", marginBottom: "32px" },
+  section:     { marginBottom: "32px" },
+  sectionHead: { fontSize: "16px", fontWeight: "600", color: "#f3f4f6", marginBottom: "16px", paddingBottom: "8px", borderBottom: "1px solid #2a2f3e" },
+  label:       { display: "block", fontSize: "13px", color: "#9ca3af", marginBottom: "6px" },
+  input:       { width: "100%", backgroundColor: "#252b3b", border: "1px solid #3a4050", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#f3f4f6", outline: "none", boxSizing: "border-box" },
+  textarea:    { width: "100%", backgroundColor: "#252b3b", border: "1px solid #3a4050", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#f3f4f6", outline: "none", resize: "vertical", minHeight: "100px", boxSizing: "border-box" },
+  select:      { width: "100%", backgroundColor: "#252b3b", border: "1px solid #3a4050", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#f3f4f6", outline: "none", cursor: "pointer" },
+  error:       { color: "#f87171", fontSize: "12px", marginTop: "4px" },
+  row:         { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" },
+  tcBox:       { backgroundColor: "#252b3b", border: "1px solid #3a4050", borderRadius: "10px", padding: "16px", marginBottom: "12px" },
+  addBtn:      { background: "none", border: "1px dashed #3a4050", borderRadius: "8px", color: "#9ca3af", padding: "8px 16px", fontSize: "13px", cursor: "pointer", width: "100%", marginTop: "8px" },
+  removeBtn:   { background: "none", border: "none", color: "#f87171", fontSize: "12px", cursor: "pointer", marginTop: "8px" },
+  langLabel:   { fontSize: "13px", fontWeight: "600", color: "#a78bfa", marginBottom: "8px" },
+  submitBtn:   { width: "100%", padding: "14px", backgroundColor: "#7c3aed", border: "none", borderRadius: "10px", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", marginTop: "8px" },
+  infoBox:     { backgroundColor: "#1a2744", border: "1px solid #2a3f6e", borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: "#93c5fd", marginBottom: "16px", lineHeight: "1.6" },
+};
+
+function AdminPanel() {
+  const navigate = useNavigate();
+
+  const { register, control, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(problemSchema),
+    defaultValues: {
+      visibletestcases: [{ input: "", output: "", explanation: "" }],
+      hiddentestcases:  [{ input: "", output: "" }],
+      starterCode: [
+        { language: "JavaScript", intialCode: "" },
+        { language: "Python",     intialCode: "" },
+        { language: "Java",       intialCode: "" },
+        { language: "C++",        intialCode: "" },
+      ],
+      referenceSolution: [
+        { language: "JavaScript", completeCode: "" },
+        { language: "Python",     completeCode: "" },
+        { language: "Java",       completeCode: "" },
+        { language: "C++",        completeCode: "" },
+      ],
+      driverCode: [
+        { language: "JavaScript", code: "" },
+        { language: "Python",     code: "" },
+        { language: "Java",       code: "" },
+        { language: "C++",        code: "" },
+      ],
+    }
+  });
+
+  const { fields: visiblefields, append: appendVisible, remove: removeVisible } = useFieldArray({ control, name: "visibletestcases" });
+  const { fields: hiddenfields,  append: appendHidden,  remove: removeHidden  } = useFieldArray({ control, name: "hiddentestcases" });
+
+  const onSubmit = async (data) => {
+    try {
+      const filteredData = {
+        ...data,
+        starterCode: data.starterCode.filter(s => s.intialCode?.trim() !== ""),
+        referenceSolution: data.referenceSolution.filter(r => r.completeCode?.trim() !== ""),
+        driverCode: data.driverCode.filter(d => d.code?.trim() !== ""),
+      };
+      await axiosClient.post("/problems/create", filteredData);
+      alert("Problem created successfully!");
+      navigate("/");
+    } catch (err) {
+      console.error("Error creating problem:", err);
+      alert("Failed to create problem. Please check the console for details.");
+    }
+  };
+
+  return (
+    <div style={S.page}>
+      <div style={S.card}>
+        <h1 style={S.heading}>Create New Problem</h1>
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+
+          {/* â”€â”€ Basic Information â”€â”€ */}
+          <div style={S.section}>
+            <p style={S.sectionHead}>Basic Information</p>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={S.label}>Title</label>
+              <input style={S.input} placeholder="Problem title" {...register("title")} />
+              {errors.title && <p style={S.error}>{errors.title.message}</p>}
+            </div>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={S.label}>Description</label>
+              <textarea style={S.textarea} placeholder="Problem description..." {...register("description")} />
+              {errors.description && <p style={S.error}>{errors.description.message}</p>}
+            </div>
+            <div style={S.row}>
+              <div>
+                <label style={S.label}>Difficulty</label>
+                <select style={S.select} {...register("difficulty")}>
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+                {errors.difficulty && <p style={S.error}>{errors.difficulty.message}</p>}
+              </div>
+              <div>
+                <label style={S.label}>Tag</label>
+                <select style={S.select} {...register("tags")}>
+                  {['Array','String','Linked List','Tree','Graph','Dynamic Programming','Backtracking','Greedy','Sorting','Searching'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                {errors.tags && <p style={S.error}>{errors.tags.message}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* â”€â”€ Visible Test Cases â”€â”€ */}
+          <div style={S.section}>
+            <p style={S.sectionHead}>Visible Test Cases</p>
+            {visiblefields.map((field, index) => (
+              <div key={field.id} style={S.tcBox}>
+                <div style={{ marginBottom: "10px" }}>
+                  <textarea style={S.textarea} placeholder="Input" {...register(`visibletestcases.${index}.input`)} />
+                  {errors.visibletestcases?.[index]?.input && <p style={S.error}>{errors.visibletestcases[index].input.message}</p>}
+                </div>
+                <div style={{ marginBottom: "10px" }}>
+                  <input style={S.input} placeholder="Output" {...register(`visibletestcases.${index}.output`)} />
+                  {errors.visibletestcases?.[index]?.output && <p style={S.error}>{errors.visibletestcases[index].output.message}</p>}
+                </div>
+                <div>
+                  <input style={S.input} placeholder="Explanation" {...register(`visibletestcases.${index}.explanation`)} />
+                  {errors.visibletestcases?.[index]?.explanation && <p style={S.error}>{errors.visibletestcases[index].explanation.message}</p>}
+                </div>
+                {visiblefields.length > 1 && (
+                  <button type="button" style={S.removeBtn} onClick={() => removeVisible(index)}>Remove</button>
+                )}
+              </div>
+            ))}
+            {errors.visibletestcases?.message && <p style={S.error}>{errors.visibletestcases.message}</p>}
+            <button type="button" style={S.addBtn} onClick={() => appendVisible({ input: "", output: "", explanation: "" })}>
+              + Add Visible Test Case
+            </button>
+          </div>
+
+          {/* â”€â”€ Hidden Test Cases â”€â”€ */}
+          <div style={S.section}>
+            <p style={S.sectionHead}>Hidden Test Cases</p>
+            {hiddenfields.map((field, index) => (
+              <div key={field.id} style={S.tcBox}>
+                <div style={{ marginBottom: "10px" }}>
+                  <textarea style={S.textarea} placeholder="Input" {...register(`hiddentestcases.${index}.input`)} />
+                  {errors.hiddentestcases?.[index]?.input && <p style={S.error}>{errors.hiddentestcases[index].input.message}</p>}
+                </div>
+                <div>
+                  <input style={S.input} placeholder="Output" {...register(`hiddentestcases.${index}.output`)} />
+                  {errors.hiddentestcases?.[index]?.output && <p style={S.error}>{errors.hiddentestcases[index].output.message}</p>}
+                </div>
+                {hiddenfields.length > 1 && (
+                  <button type="button" style={S.removeBtn} onClick={() => removeHidden(index)}>Remove</button>
+                )}
+              </div>
+            ))}
+            {errors.hiddentestcases?.message && <p style={S.error}>{errors.hiddentestcases.message}</p>}
+            <button type="button" style={S.addBtn} onClick={() => appendHidden({ input: "", output: "" })}>
+              + Add Hidden Test Case
+            </button>
+          </div>
+
+          {/* â”€â”€ Starter Code â”€â”€ */}
+          <div style={S.section}>
+            <p style={S.sectionHead}>Starter Code</p>
+            <div style={S.infoBox}>
+              User ko yahi code dikhega editor mein. Sirf function signature likho â€” input/output driver code alag section mein hoga.
+            </div>
+            {["JavaScript", "Python", "Java", "C++"].map((lang, index) => (
+              <div key={lang} style={{ ...S.tcBox, marginBottom: "12px" }}>
+                <p style={S.langLabel}>{lang}</p>
+                <input type="hidden" value={lang} {...register(`starterCode.${index}.language`)} />
+                <textarea
+                  style={{ ...S.textarea, minHeight: "120px", fontFamily: "monospace", fontSize: "13px" }}
+                  placeholder={`Write ${lang} starter code here...`}
+                  {...register(`starterCode.${index}.intialCode`)}
+                />
+                {errors.starterCode?.[index]?.intialCode && <p style={S.error}>{errors.starterCode[index].intialCode.message}</p>}
+              </div>
+            ))}
+          </div>
+
+          {/* â”€â”€ Driver Code â”€â”€ */}
+          <div style={S.section}>
+            <p style={S.sectionHead}>Driver Code (Input/Output Handler)</p>
+            <div style={S.infoBox}>
+              Yeh code user ko nahi dikhega. Yeh stdin se input parse karega, user ke function ko call karega, aur output print karega. User ke starter code ke saath automatically append hoga.
+            </div>
+            {["JavaScript", "Python", "Java", "C++"].map((lang, index) => (
+              <div key={lang} style={{ ...S.tcBox, marginBottom: "12px" }}>
+                <p style={S.langLabel}>{lang}</p>
+                <input type="hidden" value={lang} {...register(`driverCode.${index}.language`)} />
+                <textarea
+                  style={{ ...S.textarea, minHeight: "140px", fontFamily: "monospace", fontSize: "13px" }}
+                  placeholder={`Driver code for ${lang} â€” reads input, calls function, prints output...`}
+                  {...register(`driverCode.${index}.code`)}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* â”€â”€ Reference Solution â”€â”€ */}
+          <div style={S.section}>
+            <p style={S.sectionHead}>Reference Solution</p>
+            <div style={S.infoBox}>
+              Complete solution likho â€” function + driver code dono include karo yahan.
+            </div>
+            {["JavaScript", "Python", "Java", "C++"].map((lang, index) => (
+              <div key={lang} style={{ ...S.tcBox, marginBottom: "12px" }}>
+                <p style={S.langLabel}>{lang}</p>
+                <input type="hidden" value={lang} {...register(`referenceSolution.${index}.language`)} />
+                <textarea
+                  style={{ ...S.textarea, minHeight: "120px", fontFamily: "monospace", fontSize: "13px" }}
+                  placeholder={`Write complete ${lang} solution here...`}
+                  {...register(`referenceSolution.${index}.completeCode`)}
+                />
+                {errors.referenceSolution?.[index]?.completeCode && <p style={S.error}>{errors.referenceSolution[index].completeCode.message}</p>}
+              </div>
+            ))}
+          </div>
+
+          {/* â”€â”€ Submit â”€â”€ */}
+          <button
+            type="submit"
+            style={S.submitBtn}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#6d28d9")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#7c3aed")}
+          >
+            Create Problem
+          </button>
+
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default AdminPanel;
+
+================================================================================
+FILE: Frontend\src\pages\ContestList.jsx
+================================================================================
+
+import { useEffect, useState } from "react";
+import { getContests } from "../utils/contestApi";
+import { useNavigate, NavLink } from "react-router-dom";
+import { useSelector } from "react-redux";
+import axiosClient from "../utils/axiosClient";
+
+const ContestList = () => {
+ 
+  const [contests, setContests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
+
+  const isAdmin = user?.reply?.role === "admin" || user?.role === "admin";
+
+  const fetchContests = async () => {
+    try {
+      setLoading(true);
+      const data = await getContests();
+      setContests(data?.contests || []);
+    } catch (err) {
+      console.log(err);
+      setError("Failed to load contests");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContests();
+  }, []);
+
+  const handleDelete = async (e, contestId) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this contest? This cannot be undone.")) return;
+    try {
+      await axiosClient.delete(`/contests/${contestId}`);
+      fetchContests();
+    } catch (err) {
+      alert("Failed to delete contest: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const getStatus = (contest) => {
+    const now = Date.now();
+    const start = new Date(contest.startTime).getTime();
+    const end = start + contest.duration * 60000;
+    if (now < start) return "upcoming";
+    if (now <= end) return "live";
+    return "ended";
+  };
+
+  const StatusBadge = ({ status }) => {
+    const map = {
+      upcoming: { bg: "#1e40af22", color: "#60a5fa", label: "Upcoming" },
+      live: { bg: "#10b98122", color: "#10b981", label: "ðŸ”´ Live" },
+      ended: { bg: "#37415122", color: "#9ca3af", label: "Ended" },
+    };
+    const s = map[status];
+    return (
+      <span style={{ padding: "2px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", backgroundColor: s.bg, color: s.color }}>
+        {s.label}
+      </span>
+    );
+  };
+
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: "#1a1f2e", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontFamily: "sans-serif" }}>
+      Loading contests...
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#1a1f2e", fontFamily: "sans-serif" }}>
+
+      {/* Navbar */}
+      <div style={{ borderBottom: "1px solid #2a2f3e", padding: "16px 40px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+          <NavLink to="/" style={{ color: "#fff", fontWeight: "700", textDecoration: "none" }}>CodeShinzo</NavLink>
+          <NavLink to="/" style={{ color: "#9ca3af", textDecoration: "none", fontSize: "14px" }}>Problems</NavLink>
+          <NavLink to="/contests" style={{ color: "#a78bfa", textDecoration: "none", fontSize: "14px", fontWeight: "600" }}>Contests</NavLink>
+          <NavLink to="/leaderboard" style={{ color: "#9ca3af", textDecoration: "none", fontSize: "14px" }}>Leaderboard</NavLink>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => navigate("/admin/contest")}
+            style={{ padding: "8px 16px", background: "#7c3aed", border: "none", borderRadius: "8px", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+          >
+            + Create Contest
+          </button>
+        )}
+      </div>
+
+      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "32px 24px" }}>
+
+        <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#f3f4f6", marginBottom: "24px" }}>
+          All Contests
+        </h1>
+
+        {error && (
+          <div style={{ color: "#f87171", marginBottom: "16px", fontSize: "14px" }}>{error}</div>
+        )}
+
+        {contests.length === 0 ? (
+          <div style={{ color: "#6b7280", textAlign: "center", padding: "80px", fontSize: "14px" }}>
+            No contests available yet.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {contests.map((c) => {
+              const status = getStatus(c);
+              const start = new Date(c.startTime);
+              const end = new Date(start.getTime() + c.duration * 60000);
+
+              return (
+                <div
+                  key={c._id}
+                  onClick={() => navigate(`/contest/${c._id}`)}
+                  style={{
+                    padding: "18px 20px", background: "#1e2433", border: "1px solid #2a2f3e",
+                    borderRadius: "10px", cursor: "pointer", display: "flex",
+                    justifyContent: "space-between", alignItems: "center",
+                    transition: "background 0.15s"
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = "#242b3d"}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = "#1e2433"}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                      <span style={{ color: "#f3f4f6", fontWeight: "600", fontSize: "15px" }}>{c.title}</span>
+                      <StatusBadge status={status} />
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#9ca3af", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <span>Start: {start.toLocaleString()}</span>
+                      <span>â€¢</span>
+                      <span>End: {end.toLocaleString()}</span>
+                      <span>â€¢</span>
+                      <span>Duration: {c.duration} min</span>
+                      <span>â€¢</span>
+                      <span>{c.problems?.length || 0} problems</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "16px" }} onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => navigate(`/contest/${c._id}`)}
+                      style={{
+                        padding: "7px 16px", borderRadius: "6px", border: "none",
+                        background: status === "live" ? "#10b981" : status === "upcoming" ? "#3b82f6" : "#374151",
+                        color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer"
+                      }}
+                    >
+                      {status === "live" ? "Join Now" : status === "upcoming" ? "View" : "View Results"}
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => handleDelete(e, c._id)}
+                        style={{
+                          padding: "7px 14px", borderRadius: "6px", border: "none",
+                          background: "#ef4444", color: "#fff", fontSize: "12px",
+                          fontWeight: "600", cursor: "pointer"
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ContestList;
+
+================================================================================
+FILE: Frontend\src\pages\ContestPage.jsx
+================================================================================
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useParams, NavLink } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { getContest } from "../utils/contestApi";
+import Editor from "@monaco-editor/react";
+import axiosClient from "../utils/axiosClient";
+
+const LANGUAGE_MAP = {
+  "C++": "cpp",
+  JavaScript: "javascript",
+  Python: "python",
+  Java: "java",
+};
+
+const ContestPage = () => {
+  const { id } = useParams();
+  const { user } = useSelector((state) => state.auth);
+
+  const [contest, setContest] = useState(null);
+  const [selectedProblem, setSelectedProblem] = useState(null);
+  const [code, setCode] = useState("// Select a problem to start coding");
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [result, setResult] = useState(null);
+  const [activeLeftTab, setActiveLeftTab] = useState("problems");
+  const [activeRightTab, setActiveRightTab] = useState("code");
+  const [running, setRunning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [language, setLanguage] = useState("C++");
+  const [timeLeft, setTimeLeft] = useState("");
+  const [contestStatus, setContestStatus] = useState("upcoming");
+
+  // â”€â”€ Ban State â”€â”€
+  const [isBanned, setIsBanned] = useState(false);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [showBanAlert, setShowBanAlert] = useState(false);
+  const [bannedUsers, setBannedUsers] = useState([]);
+  const tabSwitchRef = useRef(false); // prevent duplicate calls
+
+  // â”€â”€ Fetch Contest â”€â”€
+  useEffect(() => {
+    const fetchContest = async () => {
+      try {
+        const data = await getContest(id);
+        setContest(data.contest);
+      } catch (err) {
+        console.log("Contest Fetch Error:", err);
+      }
+    };
+    fetchContest();
+  }, [id]);
+
+  // â”€â”€ Check Ban Status on Load â”€â”€
+  useEffect(() => {
+    if (!id) return;
+    const checkBan = async () => {
+      try {
+        const res = await axiosClient.get(`/contests/ban/status/${id}`);
+        if (res.data.isBanned) {
+          setIsBanned(true);
+          setTabSwitchCount(res.data.tabSwitchCount);
+        }
+      } catch (err) {
+        console.log("Ban check error:", err);
+      }
+    };
+    checkBan();
+  }, [id]);
+
+  // â”€â”€ Timer â”€â”€
+  useEffect(() => {
+    if (!contest) return;
+    const tick = () => {
+      const now = Date.now();
+      const start = new Date(contest.startTime).getTime();
+      const end = start + contest.duration * 60000;
+      if (now < start) {
+        setContestStatus("upcoming");
+        const diff = start - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        setTimeLeft(`Starts in ${h}h ${m}m ${s}s`);
+      } else if (now <= end) {
+        setContestStatus("live");
+        const diff = end - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        setTimeLeft(`${h}h ${m}m ${s}s left`);
+      } else {
+        setContestStatus("ended");
+        setTimeLeft("Contest Ended");
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [contest]);
+
+  // â”€â”€ Tab Switch Detection â”€â”€
+const handleVisibilityChange = useCallback(async () => {
+  // â”€â”€ Check if tab switch ban is enabled for this contest â”€â”€
+  if (!contest?.tabSwitchBanEnabled) return; // â† NEW CHECK
+
+  if (contestStatus !== "live" || isBanned || tabSwitchRef.current) return;
+  if (document.hidden) {
+    tabSwitchRef.current = true;
+    try {
+      const res = await axiosClient.post("/contests/ban/tabswitch", {
+        contestId: id,
+      });
+      setIsBanned(true);
+      setTabSwitchCount(res.data.tabSwitchCount || 1);
+      setShowBanAlert(true);
+    } catch (err) {
+      console.log("Tab switch ban error:", err);
+    } finally {
+      tabSwitchRef.current = false;
+    }
+  }
+}, [contestStatus, isBanned, id, contest?.tabSwitchBanEnabled]); // â† dependency add
+
+  useEffect(() => {
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [handleVisibilityChange]);
+
+  // â”€â”€ Live Leaderboard + Banned Users Polling â”€â”€
+  useEffect(() => {
+    if (!contest?._id) return;
+
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await axiosClient.get(`/leaderboard/${contest._id}`);
+        setLeaderboard(res.data.board || []);
+      } catch (err) {
+        console.log("Leaderboard Error:", err);
+      }
+    };
+
+    const fetchBannedUsers = async () => {
+      try {
+        const res = await axiosClient.get(`/contests/ban/all/${contest._id}`);
+        setBannedUsers(res.data.bans || []);
+      } catch (err) {
+        console.log("Banned users error:", err);
+      }
+    };
+
+    fetchLeaderboard();
+    fetchBannedUsers();
+    const interval = setInterval(() => {
+      fetchLeaderboard();
+      fetchBannedUsers();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [contest?._id, result]);
+
+  const isActive = contestStatus === "live" && !isBanned;
+  const isAdmin = user?.reply?.role === "admin" || user?.role === "admin";
+
+  const isBannedUser = (userId) => {
+    return bannedUsers.some(
+      (b) => b.userId?._id?.toString() === userId?.toString()
+    );
+  };
+
+  // â”€â”€ Run Code â”€â”€
+  const handleRun = async () => {
+    if (!selectedProblem) return alert("Select a problem first");
+    if (isBanned) return alert("You are banned from this contest due to tab switching");
+    if (!isActive) return alert(contestStatus === "upcoming" ? "Contest hasn't started yet" : "Contest has ended");
+
+    setRunning(true);
+    setActiveRightTab("result");
+    setResult(null);
+    try {
+      const res = await axiosClient.post(`/problems/run/${selectedProblem._id}`, { code, language });
+      setResult(res.data);
+    } catch (err) {
+      setResult({ error: err.response?.data?.error || err.message });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  // â”€â”€ Submit Code â”€â”€
+  const handleSubmit = async () => {
+    if (!selectedProblem) return alert("Select a problem first");
+    if (isBanned) return alert("You are banned from this contest due to tab switching");
+    if (!isActive) return alert(contestStatus === "upcoming" ? "Contest hasn't started yet" : "Contest has ended");
+
+    setSubmitting(true);
+    setActiveRightTab("result");
+    setResult(null);
+    try {
+      const res = await axiosClient.post(`/problems/submit/${selectedProblem._id}`, {
+        code,
+        language,
+        contestId: contest._id,
+      });
+      setResult(res.data);
+    } catch (err) {
+      setResult({ error: err.response?.data?.error || err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const statusColor = (s) => {
+    if (s === "Accepted") return "#10b981";
+    if (s === "Wrong Answer") return "#ef4444";
+    return "#f59e0b";
+  };
+
+  if (!contest) return (
+    <div style={{ minHeight: "100vh", background: "#1a1f2e", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontFamily: "sans-serif" }}>
+      Loading contest...
+    </div>
+  );
+
+  return (
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#1a1f2e", fontFamily: "sans-serif", overflow: "hidden" }}>
+
+      {/* â”€â”€ BAN ALERT MODAL â”€â”€ */}
+      {showBanAlert && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            backgroundColor: "#1e2433", border: "2px solid #ef4444",
+            borderRadius: "16px", padding: "32px", maxWidth: "440px", textAlign: "center"
+          }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>ðŸš©</div>
+            <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#ef4444", marginBottom: "12px" }}>
+              Tab Switch Detected!
+            </h2>
+            <p style={{ fontSize: "14px", color: "#d1d5db", lineHeight: "1.7", marginBottom: "20px" }}>
+              You switched tabs during the contest. You have been <strong style={{ color: "#ef4444" }}>banned</strong> from submitting code for the remainder of this contest.
+            </p>
+            <div style={{
+              backgroundColor: "#ef444422", border: "1px solid #ef444444",
+              borderRadius: "8px", padding: "12px", marginBottom: "20px", fontSize: "13px", color: "#f87171"
+            }}>
+              Tab switches detected: <strong>{tabSwitchCount}</strong>
+            </div>
+            <button
+              onClick={() => setShowBanAlert(false)}
+              style={{
+                padding: "10px 24px", backgroundColor: "#ef4444", border: "none",
+                borderRadius: "8px", color: "#fff", fontWeight: "600", fontSize: "14px", cursor: "pointer"
+              }}
+            >
+              I understand
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* â”€â”€ BANNED BANNER â”€â”€ */}
+      {isBanned && contestStatus === "live" && (
+        <div style={{
+          backgroundColor: "#ef444422", borderBottom: "1px solid #ef4444",
+          padding: "8px 20px", textAlign: "center", fontSize: "13px",
+          color: "#f87171", fontWeight: "600", flexShrink: 0
+        }}>
+          ðŸš© You are banned from this contest due to tab switching. Tab switches: {tabSwitchCount}
+        </div>
+      )}
+
+      {/* â”€â”€ NAVBAR â”€â”€ */}
+      <div style={{ height: "50px", background: "#0b1220", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", flexShrink: 0 }}>
+        <NavLink to="/" style={{ color: "#a78bfa", fontWeight: "700", textDecoration: "none", fontSize: "15px" }}>
+          CodeShinzo
+        </NavLink>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{
+            fontSize: "13px", fontWeight: "600", padding: "4px 12px", borderRadius: "20px",
+            backgroundColor: isActive ? "#10b98122" : contestStatus === "ended" ? "#ef444422" : "#3b82f622",
+            color: isActive ? "#10b981" : contestStatus === "ended" ? "#ef4444" : "#60a5fa"
+          }}>
+            {contestStatus === "live" && "ðŸ”´ "}{timeLeft}
+          </span>
+
+          <select
+            value={language}
+            onChange={(e) => {
+              setLanguage(e.target.value);
+              if (selectedProblem) {
+                const starter = selectedProblem.starterCode?.find(s => s.language === e.target.value);
+                if (starter?.intialCode) setCode(starter.intialCode);
+              }
+            }}
+            style={{ padding: "5px 10px", borderRadius: "6px", border: "1px solid #334155", background: "#111827", color: "white", fontSize: "12px", cursor: "pointer", outline: "none" }}
+          >
+            {["C++", "JavaScript", "Python", "Java"].map(l => <option key={l}>{l}</option>)}
+          </select>
+
+          <button
+            onClick={handleRun}
+            disabled={!isActive || running || submitting}
+            style={{
+              padding: "6px 16px", borderRadius: "6px", border: "1px solid #3b82f6",
+              background: isActive ? "#2563eb" : "#374151", color: "white", fontWeight: "600",
+              fontSize: "12px", cursor: isActive ? "pointer" : "not-allowed", opacity: isActive ? 1 : 0.5
+            }}
+          >
+            {running ? "Running..." : "Run"}
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            disabled={!isActive || running || submitting}
+            style={{
+              padding: "6px 16px", borderRadius: "6px", border: "none",
+              background: isActive ? "#10b981" : "#374151", color: "white", fontWeight: "600",
+              fontSize: "12px", cursor: isActive ? "pointer" : "not-allowed", opacity: isActive ? 1 : 0.5
+            }}
+          >
+            {submitting ? "Submitting..." : "Submit"}
+          </button>
+        </div>
+      </div>
+
+      {/* â”€â”€ BODY â”€â”€ */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+        {/* â”€â”€ LEFT PANEL â”€â”€ */}
+        <div style={{ width: "40%", display: "flex", flexDirection: "column", borderRight: "1px solid #2a2f3e", overflow: "hidden" }}>
+
+          <div style={{ padding: "12px 16px", background: "#1e2433", borderBottom: "1px solid #2a2f3e", flexShrink: 0 }}>
+            <h2 style={{ fontSize: "15px", fontWeight: "700", color: "#f3f4f6", margin: 0 }}>{contest.title}</h2>
+            {contest.description && (
+              <p style={{ fontSize: "12px", color: "#9ca3af", margin: "4px 0 0" }}>{contest.description}</p>
+            )}
+          </div>
+
+          <div style={{ display: "flex", background: "#1e2433", borderBottom: "1px solid #2a2f3e", flexShrink: 0 }}>
+            {["problems", "leaderboard"].map(tab => (
+              <button key={tab}
+                onClick={() => setActiveLeftTab(tab)}
+                style={{
+                  padding: "10px 16px", fontSize: "13px", fontWeight: "500", cursor: "pointer",
+                  background: "none", border: "none",
+                  color: activeLeftTab === tab ? "#f3f4f6" : "#6b7280",
+                  borderBottom: activeLeftTab === tab ? "2px solid #a78bfa" : "2px solid transparent"
+                }}>
+                {tab === "problems" ? "Problems" : "ðŸ† Leaderboard"}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto" }}>
+
+            {/* Problems Tab */}
+            {activeLeftTab === "problems" && (
+              <div>
+                {selectedProblem ? (
+                  <div style={{ padding: "16px" }}>
+                    <button
+                      onClick={() => setSelectedProblem(null)}
+                      style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", fontSize: "12px", marginBottom: "12px", padding: 0 }}
+                    >
+                      â† Back to problems
+                    </button>
+                    <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#f3f4f6", marginBottom: "8px" }}>{selectedProblem.title}</h3>
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                      <span style={{
+                        padding: "2px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600",
+                        backgroundColor: selectedProblem.difficulty === "Easy" ? "#10b98122" : selectedProblem.difficulty === "Medium" ? "#f59e0b22" : "#ef444422",
+                        color: selectedProblem.difficulty === "Easy" ? "#10b981" : selectedProblem.difficulty === "Medium" ? "#f59e0b" : "#ef4444"
+                      }}>
+                        {selectedProblem.difficulty}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "13px", color: "#d1d5db", lineHeight: "1.7", marginBottom: "16px" }}>
+                      {selectedProblem.description}
+                    </p>
+                    {selectedProblem.visibletestcases?.map((tc, i) => (
+                      <div key={i} style={{ marginBottom: "12px" }}>
+                        <p style={{ fontSize: "13px", fontWeight: "600", color: "#f3f4f6", marginBottom: "6px" }}>Example {i + 1}:</p>
+                        <div style={{ backgroundColor: "#252b3b", borderRadius: "8px", padding: "10px 14px", fontSize: "12px", color: "#d1d5db", lineHeight: "1.8" }}>
+                          <div><span style={{ color: "#9ca3af" }}>Input: </span>{tc.input}</div>
+                          <div><span style={{ color: "#9ca3af" }}>Output: </span>{tc.output}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: "12px" }}>
+                    {!contest.problems || contest.problems.length === 0 ? (
+                      <div style={{ color: "#6b7280", textAlign: "center", padding: "40px", fontSize: "13px" }}>No problems added yet.</div>
+                    ) : (
+                      contest.problems.map((p, i) => (
+                        <div key={p._id}
+                          onClick={() => {
+                            setSelectedProblem(p);
+                            const starter = p.starterCode?.find(s => s.language === language);
+                            setCode(starter?.intialCode || `// Write your ${language} solution here`);
+                            setResult(null);
+                          }}
+                          style={{
+                            padding: "14px 16px", background: "#1e2433", border: "1px solid #2a2f3e",
+                            borderRadius: "8px", marginBottom: "8px", cursor: "pointer"
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = "#242b3d"}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = "#1e2433"}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ color: "#f3f4f6", fontWeight: "500", fontSize: "14px" }}>
+                              {i + 1}. {p.title}
+                            </span>
+                            <span style={{
+                              fontSize: "11px", fontWeight: "600", padding: "2px 8px", borderRadius: "20px",
+                              backgroundColor: p.difficulty === "Easy" ? "#10b98122" : p.difficulty === "Medium" ? "#f59e0b22" : "#ef444422",
+                              color: p.difficulty === "Easy" ? "#10b981" : p.difficulty === "Medium" ? "#f59e0b" : "#ef4444"
+                            }}>
+                              {p.difficulty}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Leaderboard Tab */}
+            {activeLeftTab === "leaderboard" && (
+              <div style={{ padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <p style={{ fontSize: "14px", fontWeight: "600", color: "#f3f4f6", margin: 0 }}>Contest Leaderboard</p>
+                  <span style={{ fontSize: "11px", color: contestStatus === "live" ? "#10b981" : "#6b7280" }}>
+                    {contestStatus === "live" ? "ðŸ”´ Live â€¢ updates every 5s" : "Final"}
+                  </span>
+                </div>
+
+                {leaderboard.length === 0 ? (
+                  <div style={{ color: "#6b7280", textAlign: "center", padding: "40px", fontSize: "13px" }}>
+                    No participants yet.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{
+                      display: "grid", gridTemplateColumns: "44px 1fr 50px 60px 40px",
+                      padding: "8px 12px", background: "#111827", borderRadius: "6px",
+                      marginBottom: "6px", fontSize: "11px", color: "#9ca3af", fontWeight: "600"
+                    }}>
+                      <span>Rank</span>
+                      <span>Name</span>
+                      <span style={{ textAlign: "center" }}>Solved</span>
+                      <span style={{ textAlign: "center" }}>Score</span>
+                      <span style={{ textAlign: "center" }}>Flag</span>
+                    </div>
+
+                    {leaderboard.map((entry, i) => {
+                      const banned = isBannedUser(entry.userId);
+                      return (
+                        <div key={entry.userId?.toString() || i}
+                          style={{
+                            display: "grid", gridTemplateColumns: "44px 1fr 50px 60px 40px",
+                            padding: "10px 12px", background: banned ? "#ef444411" : "#1e2433",
+                            border: `1px solid ${banned ? "#ef444444" : "#2a2f3e"}`,
+                            borderRadius: "8px", marginBottom: "6px", fontSize: "13px", color: "#d1d5db"
+                          }}>
+                          <span style={{
+                            fontWeight: "700",
+                            color: i === 0 ? "#facc15" : i === 1 ? "#cbd5e1" : i === 2 ? "#f97316" : "#9ca3af"
+                          }}>
+                            #{entry.rank || i + 1}
+                          </span>
+                          <span style={{ color: banned ? "#f87171" : "#f3f4f6", fontWeight: "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {entry.name || `User ${i + 1}`}
+                          </span>
+                          <span style={{ textAlign: "center", color: "#10b981", fontWeight: "600" }}>
+                            {entry.solved || 0}
+                          </span>
+                          <span style={{ textAlign: "center", color: "#a78bfa", fontWeight: "700" }}>
+                            {entry.score || 0}
+                          </span>
+                          <span style={{ textAlign: "center", fontSize: "16px" }}>
+                            {banned ? "ðŸš©" : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* â”€â”€ RIGHT PANEL â”€â”€ */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+          <div style={{ display: "flex", alignItems: "center", background: "#1e2433", borderBottom: "1px solid #2a2f3e", flexShrink: 0 }}>
+            {["code", "result"].map(t => (
+              <button key={t}
+                onClick={() => setActiveRightTab(t)}
+                style={{
+                  padding: "10px 16px", fontSize: "13px", fontWeight: "500", cursor: "pointer",
+                  background: "none", border: "none",
+                  color: activeRightTab === t ? "#f3f4f6" : "#6b7280",
+                  borderBottom: activeRightTab === t ? "2px solid #a78bfa" : "2px solid transparent"
+                }}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+
+            {(!isActive) && (
+              <span style={{
+                marginLeft: "auto", marginRight: "16px", fontSize: "11px", fontWeight: "600",
+                padding: "3px 10px", borderRadius: "20px",
+                backgroundColor: isBanned ? "#ef444422" : contestStatus === "ended" ? "#ef444422" : "#3b82f622",
+                color: isBanned ? "#ef4444" : contestStatus === "ended" ? "#ef4444" : "#60a5fa"
+              }}>
+                {isBanned ? "ðŸš© Banned" : contestStatus === "ended" ? "â›” Contest Ended" : "â³ Not Started"}
+              </span>
+            )}
+          </div>
+
+          {/* Editor */}
+          {activeRightTab === "code" && (
+            <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+              {isBanned && contestStatus === "live" && (
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: "rgba(239,68,68,0.08)", zIndex: 10,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  pointerEvents: "none"
+                }}>
+                  <span style={{ fontSize: "48px" }}>ðŸš©</span>
+                  <p style={{ color: "#f87171", fontWeight: "600", fontSize: "14px", marginTop: "8px" }}>
+                    You are banned from this contest
+                  </p>
+                </div>
+              )}
+              {!selectedProblem ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#6b7280", fontSize: "14px", flexDirection: "column", gap: "8px" }}>
+                  <span style={{ fontSize: "32px" }}>ðŸ‘ˆ</span>
+                  Select a problem from the left panel to start coding
+                </div>
+              ) : (
+                <Editor
+                  height="100%"
+                  language={LANGUAGE_MAP[language] || "cpp"}
+                  value={code}
+                  onChange={(v) => setCode(v || "")}
+                  theme="vs-dark"
+                  options={{
+                    fontSize: 14, minimap: { enabled: false },
+                    scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 12 },
+                    readOnly: isBanned && contestStatus === "live",
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Result */}
+          {activeRightTab === "result" && (
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+              {(running || submitting) && (
+                <div style={{ color: "#9ca3af", fontSize: "14px" }}>Running your code...</div>
+              )}
+              {result?.error && (
+                <div style={{ backgroundColor: "#ef444422", border: "1px solid #ef444444", borderRadius: "8px", padding: "16px", color: "#f87171", fontSize: "14px" }}>
+                  {result.error}
+                </div>
+              )}
+              {result && !result.error && (
+                <div>
+                  {(result.verdict || result.status) && (
+                    <div style={{ marginBottom: "20px" }}>
+                      <span style={{ fontSize: "20px", fontWeight: "700", color: statusColor(result.verdict || result.status) }}>
+                        {(result.verdict || result.status) === "Accepted" ? "âœ“ Accepted" : `âœ— ${result.verdict || result.status}`}
+                      </span>
+                      <span style={{ marginLeft: "12px", fontSize: "14px", color: "#9ca3af" }}>
+                        {result.passedCount ?? result.passed ?? 0}/{result.total} testcases
+                      </span>
+                    </div>
+                  )}
+                  {result.results?.map((r, i) => (
+                    <div key={i} style={{
+                      marginBottom: "10px", backgroundColor: "#252b3b", borderRadius: "8px",
+                      padding: "12px 16px", fontSize: "13px", color: "#d1d5db", lineHeight: "1.8",
+                      borderLeft: `3px solid ${r.passed ? "#10b981" : "#ef4444"}`
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <span style={{ fontWeight: "600", color: r.passed ? "#10b981" : "#ef4444" }}>
+                          {r.passed ? "âœ“" : "âœ—"} Testcase {i + 1}
+                          {r.errorType && r.errorType !== "Accepted" && (
+                            <span style={{ marginLeft: "8px", fontSize: "11px", color: "#f59e0b" }}>({r.errorType})</span>
+                          )}
+                        </span>
+                      </div>
+                      <div><span style={{ color: "#9ca3af" }}>Input: </span>{r.input}</div>
+                      <div><span style={{ color: "#9ca3af" }}>Expected: </span>{r.expectedOutput}</div>
+                      <div>
+                        <span style={{ color: "#9ca3af" }}>Got: </span>
+                        <span style={{ color: r.passed ? "#10b981" : "#f87171" }}>{r.actualOutput || "No output"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!result && !running && !submitting && (
+                <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", marginTop: "60px" }}>
+                  Run or Submit your code to see results here.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ContestPage;
+
+================================================================================
+FILE: Frontend\src\pages\CreateContest.jsx
+================================================================================
+
+import { useEffect, useState } from "react";
+import { useNavigate, NavLink } from "react-router-dom";
+import axiosClient from "../utils/axiosClient";
+
+const CreateContest = () => {
+  const navigate = useNavigate();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [duration, setDuration] = useState("");
+  const [tabSwitchBanEnabled, setTabSwitchBanEnabled] = useState(false);
+  const [problems, setProblems] = useState([]);
+  const [selectedProblems, setSelectedProblems] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchProblems = async () => {
+      try {
+        const res = await axiosClient.get("/problems/getallproblems");
+        setProblems(res.data);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    fetchProblems();
+  }, []);
+
+  const toggleProblem = (id) => {
+    setSelectedProblems((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
+  };
+
+  const handleCreate = async () => {
+    setLoading(true);
+    try {
+      await axiosClient.post("/contests/create", {
+        title,
+        description,
+        startTime,
+        duration,
+        problems: selectedProblems,
+        tabSwitchBanEnabled,
+      });
+      alert("Contest Created ðŸš€");
+      navigate("/contests");
+    } catch (err) {
+      console.log(err);
+      alert("Failed to create contest");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isFormValid = title && startTime && duration && selectedProblems.length > 0;
+
+  const S = {
+    page:     { minHeight: "100vh", backgroundColor: "#1a1f2e", fontFamily: "sans-serif", padding: "0" },
+    navbar:   { borderBottom: "1px solid #2a2f3e", padding: "16px 40px", display: "flex", justifyContent: "space-between", alignItems: "center" },
+    body:     { maxWidth: "720px", margin: "0 auto", padding: "32px 24px" },
+    heading:  { fontSize: "22px", fontWeight: "700", color: "#f3f4f6", marginBottom: "28px" },
+    label:    { display: "block", fontSize: "13px", color: "#9ca3af", marginBottom: "6px" },
+    input:    { width: "100%", backgroundColor: "#252b3b", border: "1px solid #3a4050", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#f3f4f6", outline: "none", boxSizing: "border-box" },
+    section:  { marginBottom: "24px" },
+    card:     { backgroundColor: "#1e2433", border: "1px solid #2a2f3e", borderRadius: "12px", padding: "24px" },
+    sectionH: { fontSize: "15px", fontWeight: "600", color: "#f3f4f6", marginBottom: "14px", paddingBottom: "8px", borderBottom: "1px solid #2a2f3e" },
+    problem:  (selected) => ({
+      padding: "12px 16px", marginBottom: "8px", cursor: "pointer",
+      background: selected ? "#10b98122" : "#252b3b",
+      border: `1px solid ${selected ? "#10b981" : "#3a4050"}`,
+      color: selected ? "#10b981" : "#d1d5db",
+      borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center",
+      transition: "all 0.15s",
+    }),
+    submitBtn: (valid) => ({
+      width: "100%", padding: "14px",
+      background: valid ? "#7c3aed" : "#374151",
+      border: "none", borderRadius: "10px", color: "#fff",
+      fontSize: "15px", fontWeight: "600",
+      cursor: valid ? "pointer" : "not-allowed",
+      marginTop: "8px", opacity: valid ? 1 : 0.6,
+    }),
+  };
+
+  return (
+    <div style={S.page}>
+
+      {/* Navbar */}
+      <div style={S.navbar}>
+        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+          <NavLink to="/" style={{ color: "#fff", fontWeight: "700", textDecoration: "none" }}>CodeShinzo</NavLink>
+          <NavLink to="/contests" style={{ color: "#9ca3af", textDecoration: "none", fontSize: "14px" }}>â† Back to Contests</NavLink>
+        </div>
+      </div>
+
+      <div style={S.body}>
+        <h1 style={S.heading}>Create Contest</h1>
+
+        <div style={S.card}>
+
+          {/* Title */}
+          <div style={S.section}>
+            <label style={S.label}>Contest Title *</label>
+            <input
+              style={S.input}
+              placeholder="e.g. Weekly Challenge #1"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          {/* Description */}
+          <div style={S.section}>
+            <label style={S.label}>Description (optional)</label>
+            <textarea
+              style={{ ...S.input, minHeight: "80px", resize: "vertical" }}
+              placeholder="Contest description..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          {/* Start Time + Duration */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+            <div>
+              <label style={S.label}>Start Time *</label>
+              <input
+                style={S.input}
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={S.label}>Duration (minutes) *</label>
+              <input
+                style={S.input}
+                type="number"
+                placeholder="e.g. 90"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* â”€â”€ Tab Switch Ban Toggle â”€â”€ */}
+          <div style={{
+            marginBottom: "24px",
+            backgroundColor: tabSwitchBanEnabled ? "#7c3aed22" : "#252b3b",
+            border: `1px solid ${tabSwitchBanEnabled ? "#7c3aed" : "#3a4050"}`,
+            borderRadius: "10px",
+            padding: "16px 20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            transition: "all 0.2s",
+          }}>
+            <div>
+              <p style={{ fontSize: "14px", fontWeight: "600", color: "#f3f4f6", margin: "0 0 4px 0" }}>
+                ðŸš© Tab Switch Detection
+              </p>
+              <p style={{ fontSize: "12px", color: "#9ca3af", margin: 0 }}>
+                {tabSwitchBanEnabled
+                  ? "Enabled â€” Users will be banned if they switch tabs during contest"
+                  : "Disabled â€” Users can freely switch tabs during contest"}
+              </p>
+            </div>
+
+            {/* Toggle Switch */}
+            <div
+              onClick={() => setTabSwitchBanEnabled((p) => !p)}
+              style={{
+                width: "48px", height: "26px", borderRadius: "13px", cursor: "pointer",
+                backgroundColor: tabSwitchBanEnabled ? "#7c3aed" : "#374151",
+                position: "relative", transition: "background 0.2s", flexShrink: 0,
+              }}
+            >
+              <div style={{
+                width: "20px", height: "20px", borderRadius: "50%",
+                backgroundColor: "#fff",
+                position: "absolute", top: "3px",
+                left: tabSwitchBanEnabled ? "25px" : "3px",
+                transition: "left 0.2s",
+              }} />
+            </div>
+          </div>
+
+          {/* Problems */}
+          <div style={S.section}>
+            <p style={S.sectionH}>
+              Select Problems *
+              {selectedProblems.length > 0 && (
+                <span style={{ marginLeft: "8px", fontSize: "12px", color: "#10b981", fontWeight: "400" }}>
+                  {selectedProblems.length} selected
+                </span>
+              )}
+            </p>
+            {problems.length === 0 ? (
+              <div style={{ color: "#6b7280", fontSize: "13px", textAlign: "center", padding: "20px" }}>
+                Loading problems...
+              </div>
+            ) : (
+              problems.map((p) => (
+                <div
+                  key={p._id}
+                  onClick={() => toggleProblem(p._id)}
+                  style={S.problem(selectedProblems.includes(p._id))}
+                >
+                  <span style={{ fontSize: "14px", fontWeight: "500" }}>{p.title}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{
+                      fontSize: "11px", fontWeight: "600", padding: "2px 8px", borderRadius: "20px",
+                      backgroundColor: p.difficulty === "Easy" ? "#10b98122" : p.difficulty === "Medium" ? "#f59e0b22" : "#ef444422",
+                      color: p.difficulty === "Easy" ? "#10b981" : p.difficulty === "Medium" ? "#f59e0b" : "#ef4444",
+                    }}>
+                      {p.difficulty}
+                    </span>
+                    {selectedProblems.includes(p._id) && (
+                      <span style={{ fontSize: "16px" }}>âœ“</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Submit */}
+          <button
+            onClick={handleCreate}
+            disabled={!isFormValid || loading}
+            style={S.submitBtn(isFormValid && !loading)}
+            onMouseEnter={(e) => { if (isFormValid) e.currentTarget.style.backgroundColor = "#6d28d9"; }}
+            onMouseLeave={(e) => { if (isFormValid) e.currentTarget.style.backgroundColor = "#7c3aed"; }}
+          >
+            {loading ? "Creating..." : "ðŸš€ Create Contest"}
+          </button>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CreateContest;
+
+================================================================================
+FILE: Frontend\src\pages\Homepage.jsx
+================================================================================
+
+import { useEffect, useState, useRef } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import axiosClient from "../utils/axiosClient";
+import { logoutUser } from "../authslice";
+import { checkAuth } from "../authslice";
+
+function Homepage() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+ const user = useSelector((state) => state.auth?.user);
+  console.log("USER =", user);
+
+  const [problems, setProblems] = useState([]);
+  const [solvedProblems, setSolvedProblems] = useState([]);
+  const [showLogout, setShowLogout] = useState(false);
+
+  const dropdownRef = useRef(null);
+
+  const [filters, setFilters] = useState({
+    difficulty: "all",
+    tag: "all",
+    status: "all",
+  });
+
+  /* ---------------- UI SETUP ---------------- */
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.body.style.backgroundColor = "#1a1f2e";
+    document.body.style.margin = "0";
+  }, []);
+
+  useEffect(() => {
+    dispatch(checkAuth());
+  }, []);
+
+  /* ---------------- FETCH DATA ---------------- */
+  useEffect(() => {
+    const fetchProblems = async () => {
+      try {
+        const { data } = await axiosClient.get("/problems/getallproblems");
+        setProblems(data);
+      } catch (err) {
+        console.error("Error fetching problems:", err);
+      }
+    };
+
+    const fetchSolvedProblems = async () => {
+      try {
+        const { data } = await axiosClient.get(
+          "/problems/problemsolvedbyuser/solved"
+        );
+        setSolvedProblems(data);
+      } catch (err) {
+        console.error("Error fetching solved problems:", err);
+      }
+    };
+
+    fetchProblems();
+    if (user) fetchSolvedProblems();
+  }, [user]);
+
+  /* ---------------- DROPDOWN CLOSE ---------------- */
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowLogout(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    dispatch(logoutUser());
+    setSolvedProblems([]);
+    setShowLogout(false);
+  };
+
+  const solvedSet = new Set(
+    solvedProblems.map((sp) =>
+      typeof sp === "string" ? sp : sp._id?.toString()
+    )
+  );
+
+  const allTags = [
+    "Array", "String", "Linked List", "Tree", "Graph",
+    "Dynamic Programming", "Backtracking", "Greedy",
+    "Sorting", "Searching",
+  ];
+
+  const filteredProblems = problems.filter((problem) => {
+    const difficultyMatch =
+      filters.difficulty === "all" ||
+      problem.difficulty?.toLowerCase() === filters.difficulty.toLowerCase();
+
+    const tagMatch =
+      filters.tag === "all" ||
+      (Array.isArray(problem.tags) &&
+        problem.tags.includes(filters.tag));
+
+    const isSolved = solvedSet.has(problem._id?.toString());
+
+    const statusMatch =
+      filters.status === "all" ||
+      (filters.status === "solved" && isSolved) ||
+      (filters.status === "unsolved" && !isSolved);
+
+    return difficultyMatch && tagMatch && statusMatch;
+  });
+
+  const difficultyColor = (d) => {
+    const lower = d?.toLowerCase();
+    if (lower === "easy") return { backgroundColor: "#10b981", color: "#fff" };
+    if (lower === "medium") return { backgroundColor: "#f59e0b", color: "#fff" };
+    if (lower === "hard") return { backgroundColor: "#ef4444", color: "#fff" };
+    return { backgroundColor: "#374151", color: "#fff" };
+  };
+
+  const container = {
+    maxWidth: "860px",
+    margin: "0 auto",
+    padding: "0 24px",
+  };
+
+  const selectStyle = {
+    backgroundColor: "#252b3b",
+    color: "#d1d5db",
+    border: "1px solid #3a4050",
+    padding: "10px 14px",
+    borderRadius: "8px",
+    outline: "none",
+    cursor: "pointer",
+    minWidth: "150px"
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: "#1a1f2e" }}>
+
+      {/* NAVBAR */}
+      <div style={{ borderBottom: "1px solid #2a2f3e" }}>
+        <div style={{
+          padding: "16px 40px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+
+          <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+            <span style={{ color: "#fff", fontWeight: "700" }}>
+              CodeShinzo
+            </span>
+
+            <NavLink to="/" style={{ color: "#9ca3af" }}>
+              Problems
+            </NavLink>
+
+            <NavLink to="/contests" style={{ color: "#9ca3af" }}>
+              Contests
+            </NavLink>
+
+            <NavLink to="/leaderboard" style={{ color: "#9ca3af" }}>
+              Leaderboard
+            </NavLink>
+
+            <NavLink to="/profile" style={{ color: "#9ca3af" }}>
+              Profile
+            </NavLink>
+          </div>
+
+          <div ref={dropdownRef}>
+            <button
+              onClick={() => setShowLogout((p) => !p)}
+              style={{ background: "none", border: "none", color: "#fff" }}
+            >
+              {user?.name || "Profile"}
+            </button>
+
+            {showLogout && (
+              <div style={{
+                position: "absolute",
+                background: "#252b3b",
+                border: "1px solid #3a4050",
+                borderRadius: "8px",
+                marginTop: "5px"
+              }}>
+                <button
+                  onClick={handleLogout}
+                  style={{ color: "#f87171", padding: "10px" }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div style={{ ...container, paddingTop: "20px" }}>
+        <div style={{
+          display: "flex",
+          gap: "12px",
+          marginBottom: "20px",
+          flexWrap: "wrap"
+        }}>
+
+          <button
+            onClick={() => navigate("/contests")}
+            style={{
+              padding: "10px 14px",
+              background: "#10b981",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer"
+            }}
+          >
+            ðŸŽ¯ Join Contests
+          </button>
+
+          <button
+            onClick={() => navigate("/leaderboard")}
+            style={{
+              padding: "10px 14px",
+              background: "#3b82f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer"
+            }}
+          >
+            ðŸ† Leaderboard
+          </button>
+
+          {/* ðŸ‘‘ ADMIN ONLY BUTTON */}
+         {user && user.role && user.role.toLowerCase() === "admin" &&  (
+            <button
+              onClick={() => navigate("/admin/contest")}
+              style={{
+                padding: "10px 14px",
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer"
+              }}
+            >
+              âž• Create Contest
+            </button>
+          )}
+
+        </div>
+      </div>
+
+      {/* BODY */}
+      <div style={{ ...container, paddingTop: "10px" }}>
+
+        {/* FILTERS */}
+        <div style={{
+          display: "flex",
+          gap: "16px",
+          marginBottom: "20px",
+          flexWrap: "wrap"
+        }}>
+          <select
+            style={selectStyle}
+            value={filters.status}
+            onChange={(e) =>
+              setFilters({ ...filters, status: e.target.value })
+            }
+          >
+            <option value="all">All</option>
+            <option value="solved">Solved</option>
+            <option value="unsolved">Unsolved</option>
+          </select>
+
+          <select
+            style={selectStyle}
+            value={filters.difficulty}
+            onChange={(e) =>
+              setFilters({ ...filters, difficulty: e.target.value })
+            }
+          >
+            <option value="all">All Difficulty</option>
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Hard">Hard</option>
+          </select>
+
+          <select
+            style={selectStyle}
+            value={filters.tag}
+            onChange={(e) =>
+              setFilters({ ...filters, tag: e.target.value })
+            }
+          >
+            <option value="all">All Tags</option>
+            {allTags.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* PROBLEMS */}
+        {filteredProblems.length === 0 ? (
+          <div style={{ color: "#6b7280", padding: "40px" }}>
+            No problems found.
+          </div>
+        ) : (
+          filteredProblems.map((problem) => (
+            <NavLink
+              key={problem._id}
+              to={`/problems/${problem._id}`}
+              style={{
+                display: "block",
+                padding: "16px",
+                background: "#1e2433",
+                marginBottom: "10px",
+                borderRadius: "10px",
+                textDecoration: "none"
+              }}
+            >
+              <div style={{ color: "#fff", marginBottom: "8px" }}>
+                {problem.title}
+              </div>
+            </NavLink>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Homepage;
+
+================================================================================
+FILE: Frontend\src\pages\Leaderboard.jsx
+================================================================================
+
+// Filename: Frontend/src/pages/Leaderboard.jsx
+import { useEffect, useState } from "react";
+import axiosClient from "../utils/axiosClient";
+
+function Leaderboard() {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      const { data } = await axiosClient.get("/leaderboard");
+      setUsers(data);
+    };
+    fetchLeaderboard();
+  }, []);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#1a1f2e",
+      color: "#fff",
+      padding: "40px 20px",
+      fontFamily: "sans-serif"
+    }}>
+      
+      <div style={{
+        maxWidth: "900px",
+        margin: "0 auto"
+      }}>
+
+        <h1 style={{
+          fontSize: "26px",
+          fontWeight: "700",
+          marginBottom: "30px"
+        }}>
+          ðŸ† Leaderboard
+        </h1>
+
+        <div style={{
+          borderRadius: "12px",
+          overflow: "hidden",
+          border: "1px solid #2a2f3e"
+        }}>
+
+          {/* HEADER */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "80px 1fr 150px 150px",
+            padding: "16px",
+            background: "#111827",
+            fontWeight: "600",
+            color: "#9ca3af"
+          }}>
+            <span>Rank</span>
+            <span>User</span>
+            <span>Solved</span>
+            <span>Accuracy</span>
+          </div>
+
+          {/* USERS */}
+          {users.map((u, i) => (
+            <div key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "80px 1fr 150px 150px",
+                padding: "16px",
+                borderTop: "1px solid #2a2f3e",
+                background: i < 3 ? "#1e293b" : "#1e2433"
+              }}
+            >
+
+              {/* Rank */}
+              <span style={{
+                fontWeight: "700",
+                color:
+                  i === 0 ? "#facc15" :
+                  i === 1 ? "#cbd5f5" :
+                  i === 2 ? "#f97316" :
+                  "#9ca3af"
+              }}>
+                #{u.rank}
+              </span>
+
+              {/* Name */}
+              <span>{u.name}</span>
+
+              {/* Solved */}
+              <span style={{ color: "#22c55e" }}>
+                {u.solved}
+              </span>
+
+              {/* Accuracy */}
+              <span style={{ color: "#60a5fa" }}>
+                {u.accuracy}%
+              </span>
+
+            </div>
+          ))}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Leaderboard;
+
+================================================================================
+FILE: Frontend\src\pages\Login.jsx
+================================================================================
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate, NavLink } from 'react-router-dom';
+import { loginUser, setUser } from '../authslice';
+import { useEffect, useState } from 'react';
+import axios from "axios";
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+});
+
+function Login() {
+  const [showPassword, setShowPassword] = useState(false);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const { isAuthenticated, loading, error } = useSelector(
+    (state) => state.auth
+  );
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+  });
+
+useEffect(() => {
+  if (isAuthenticated) {
+    setTimeout(() => {
+      navigate('/');
+    }, 2000); // 2 sec delay
+  }
+}, [isAuthenticated]);
+
+  // ðŸŸ¢ GOOGLE LOGIN HANDLER (REMOVED USAGE BUT KEPT COMMENT FOR STRUCTURE)
+  const handleGoogleLogin = async (response) => {
+    try {
+      const token = response.credential;
+
+      const res = await axios.post("/auth/google", { token });
+
+      dispatch(setUser(res.data));
+      navigate("/");
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // ðŸ”¥ GOOGLE SDK INIT (DISABLED BUT KEPT STRUCTURE)
+  useEffect(() => {
+    /*
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      if (!window.google) return;
+
+      window.google.accounts.id.initialize({
+        client_id: "119229563975-rg28o97on0qc4k68uu7j9jufcbentusl.apps.googleusercontent.com",
+        callback: handleGoogleLogin,
+      });
+
+      window.google.accounts.id.renderButton(
+        document.getElementById("googleBtn"),
+        {
+          theme: "outline",
+          size: "large",
+        }
+      );
+    };
+
+    document.body.appendChild(script);
+    */
+  }, []);
+
+  const onSubmit = (data) => {
+    console.log("FORM SUBMITTED âœ…", data);
+    dispatch(
+      loginUser({
+        emailId: data.email,
+        password: data.password,
+      })
+    );
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col justify-center items-center bg-[#1e2330]">
+      <div className="w-[520px] flex flex-col items-center">
+
+        <h1 className="text-5xl font-bold mb-24 text-center">
+          <span className="text-purple-400">CodeShinzo</span>
+          <span className="text-white"> â€“ Where logic meets code.</span>
+        </h1>
+
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="w-full flex flex-col gap-y-7"
+        >
+
+          {/* Email */}
+          <div className="flex flex-col gap-y-2">
+            <label className="text-gray-300 text-base">Email</label>
+            <input
+              type="email"
+              placeholder="john@example.com"
+              className={`w-full px-5 py-4 text-base rounded-md bg-[#2a3042] border text-white placeholder-gray-500 outline-none focus:border-purple-500 transition
+                ${errors.email ? 'border-red-500' : 'border-[#3d4663]'}`}
+              {...register("email")}
+            />
+            {errors.email && (
+              <span className="text-red-400 text-xs">
+                {errors.email.message}
+              </span>
+            )}
+          </div>
+
+          {/* Password */}
+          <div className="flex flex-col gap-y-2">
+            <label className="text-gray-300 text-base">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Min. 8 characters"
+                className={`w-full px-5 py-4 pr-12 text-base rounded-md bg-[#2a3042] border text-white placeholder-gray-500 outline-none focus:border-purple-500 transition
+                  ${errors.password ? 'border-red-500' : 'border-[#3d4663]'}`}
+                {...register("password")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-purple-400"
+              >
+                {showPassword ? "ðŸ™ˆ" : "ðŸ‘"}
+              </button>
+            </div>
+            {errors.password && (
+              <span className="text-red-400 text-xs">
+                {errors.password.message}
+              </span>
+            )}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="p-4 bg-red-500/20 border border-red-500 text-red-300 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+            </div>
+          )}
+
+          {/* ðŸ”¥ GOOGLE BUTTON REMOVED (kept spacing same intentionally) */}
+          <div className="flex flex-col items-center gap-3 mb-4">
+            {/* removed googleBtn */}
+            {/* removed OR divider */}
+          </div>
+
+          {/* Button */}
+          <div className="flex justify-center mt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-48 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-base rounded-lg transition disabled:opacity-50"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </div>
+
+          {/* Signup */}
+          <div className="flex justify-center items-center gap-2 mt-1">
+            <span className="text-gray-400 text-sm">
+              Don't have an account?
+            </span>
+            <NavLink
+              to="/signup"
+              className="text-purple-400 hover:text-purple-300 text-sm font-semibold"
+            >
+              Sign Up
+            </NavLink>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default Login;
+
+================================================================================
+FILE: Frontend\src\pages\ProblemPage.jsx
+================================================================================
+
+// Filename: Frontend/src/pages/ProblemPage.jsx
+// this is ProblemPage.jsx
+import { useState, useRef, useEffect } from "react";
+import { useParams, NavLink } from "react-router-dom";
+import Editor from "@monaco-editor/react";
+import axiosClient from "../utils/axiosClient";
+
+const LANGUAGES = ["C++", "JavaScript", "Python", "Java"];
+
+const LANGUAGE_MAP = {
+  "C++": { monacoLang: "cpp" },
+  JavaScript: { monacoLang: "javascript" },
+  Python: { monacoLang: "python" },
+  Java: { monacoLang: "java" },
+};
+
+function ProblemPage() {
+  const { pid } = useParams();
+  const editorRef = useRef(null);
+
+  const [problem, setProblem] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("description");
+  const [activeRightTab, setActiveRightTab] = useState("code");
+  const [selectedLang, setSelectedLang] = useState("C++");
+  const [code, setCode] = useState("");
+  const [running, setRunning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [submissionsData, setSubmissionsData] = useState(null);
+  const [subLoading, setSubLoading] = useState(false);
+  const [expandedSub, setExpandedSub] = useState(null); // for showing code
+
+  useEffect(() => {
+    const fetchProblem = async () => {
+      try {
+        const { data } = await axiosClient.get(`/problems/problembyid/${pid}`);
+        setProblem(data);
+        const starter = data?.starterCode?.find((s) => s.language === "C++");
+        setCode(starter?.intialCode || "// Write your solution here");
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProblem();
+  }, [pid]);
+
+  const fetchSubmissions = async () => {
+    setSubLoading(true);
+    try {
+      const { data } = await axiosClient.get(`/problems/submittedproblems/${pid}`);
+      setSubmissionsData(data);
+    } catch (err) {
+      console.error(err);
+      setSubmissionsData(null);
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  const handleRun = async () => {
+    setRunning(true);
+    setActiveRightTab("result");
+    setResult(null);
+    try {
+      const { data } = await axiosClient.post(`/problems/run/${pid}`, { code, language: selectedLang });
+      setResult(data);
+    } catch (err) {
+      setResult({ error: err.response?.data?.error || "Run failed" });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setActiveRightTab("result");
+    setResult(null);
+    try {
+      const { data } = await axiosClient.post(`/problems/submit/${pid}`, { code, language: selectedLang });
+      setResult(data);
+      fetchSubmissions();
+    } catch (err) {
+      setResult({ error: err.response?.data?.error || "Submit failed" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const statusColor = (s) => {
+    if (s === "Accepted") return "#10b981";
+    if (s === "Wrong Answer") return "#ef4444";
+    if (s === "Runtime Error") return "#f59e0b";
+    if (s === "Time Limit Exceeded") return "#f59e0b";
+    return "#9ca3af";
+  };
+
+  const difficultyColor = (d) => {
+    if (d === "Easy") return "#10b981";
+    if (d === "Medium") return "#f59e0b";
+    if (d === "Hard") return "#ef4444";
+    return "#9ca3af";
+  };
+
+  if (loading) return (
+    <div style={{ minHeight: "100vh", backgroundColor: "#1a1f2e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#9ca3af" }}>Loading...</div>
+    </div>
+  );
+
+  if (!problem) return (
+    <div style={{ minHeight: "100vh", backgroundColor: "#1a1f2e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#f87171" }}>Problem not found.</div>
+    </div>
+  );
+
+  return (
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#1a1f2e", fontFamily: "sans-serif", overflow: "hidden" }}>
+
+      {/* â”€â”€ NAVBAR â”€â”€ */}
+      <div style={{ height: "50px", background: "#0b1220", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", flexShrink: 0 }}>
+        <NavLink to="/" style={{ color: "#a78bfa", fontWeight: "700", textDecoration: "none", fontSize: "15px" }}>
+          CodeShinzo
+        </NavLink>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <select
+            value={selectedLang}
+            onChange={(e) => {
+              setSelectedLang(e.target.value);
+              const starter = problem?.starterCode?.find(s => s.language === e.target.value);
+              setCode(starter?.intialCode || `// Write your ${e.target.value} solution here`);
+            }}
+            style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #334155", background: "#111827", color: "white", fontSize: "13px", cursor: "pointer", outline: "none" }}
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+          <button onClick={handleRun} disabled={running || submitting}
+            style={{ padding: "7px 18px", borderRadius: "8px", border: "1px solid #3b82f6", background: "#2563eb", color: "white", fontWeight: "600", fontSize: "13px", cursor: "pointer" }}>
+            {running ? "Running..." : "Run"}
+          </button>
+          <button onClick={handleSubmit} disabled={running || submitting}
+            style={{ padding: "7px 18px", borderRadius: "8px", border: "none", background: "#10b981", color: "white", fontWeight: "600", fontSize: "13px", cursor: "pointer" }}>
+            {submitting ? "Submitting..." : "Submit"}
+          </button>
+        </div>
+      </div>
+
+      {/* â”€â”€ BODY â”€â”€ */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+        {/* â”€â”€ LEFT â”€â”€ */}
+        <div style={{ width: "45%", display: "flex", flexDirection: "column", borderRight: "1px solid #2a2f3e", overflow: "hidden" }}>
+
+          {/* Left Tabs */}
+          <div style={{ display: "flex", background: "#1e2433", borderBottom: "1px solid #2a2f3e", flexShrink: 0 }}>
+            {["description", "editorial", "solutions", "submissions"].map((tab) => (
+              <button key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  if (tab === "submissions") fetchSubmissions();
+                }}
+                style={{ padding: "10px 14px", fontSize: "13px", fontWeight: "500", cursor: "pointer", background: "none", border: "none",
+                  color: activeTab === tab ? "#f3f4f6" : "#6b7280",
+                  borderBottom: activeTab === tab ? "2px solid #a78bfa" : "2px solid transparent" }}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Left Content */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+
+            {/* Description */}
+            {activeTab === "description" && (
+              <>
+                <div style={{ marginBottom: "16px" }}>
+                  <h1 style={{ fontSize: "20px", fontWeight: "700", color: "#f3f4f6", marginBottom: "10px" }}>{problem.title}</h1>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ padding: "2px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "600", backgroundColor: difficultyColor(problem.difficulty) + "22", color: difficultyColor(problem.difficulty), border: `1px solid ${difficultyColor(problem.difficulty)}44` }}>
+                      {problem.difficulty}
+                    </span>
+                    {problem.tags && (
+                      <span style={{ padding: "2px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "600", backgroundColor: "#0e749022", color: "#22d3ee", border: "1px solid #0e749044" }}>
+                        {problem.tags}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p style={{ fontSize: "14px", color: "#d1d5db", lineHeight: "1.7", marginBottom: "24px" }}>{problem.description}</p>
+                {problem.visibletestcases?.map((tc, i) => (
+                  <div key={i} style={{ marginBottom: "20px" }}>
+                    <p style={{ fontSize: "14px", fontWeight: "600", color: "#f3f4f6", marginBottom: "8px" }}>Example {i + 1}:</p>
+                    <div style={{ backgroundColor: "#252b3b", borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: "#d1d5db", lineHeight: "1.8" }}>
+                      <div><span style={{ color: "#9ca3af" }}>Input: </span>{tc.input}</div>
+                      <div><span style={{ color: "#9ca3af" }}>Output: </span>{tc.output}</div>
+                      {tc.explanation && <div><span style={{ color: "#9ca3af" }}>Explanation: </span>{tc.explanation}</div>}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {activeTab === "editorial" && (
+              <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", marginTop: "60px" }}>Editorial not available yet.</div>
+            )}
+
+            {activeTab === "solutions" && (
+              <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", marginTop: "60px" }}>No solutions yet.</div>
+            )}
+
+            {/* â”€â”€ SUBMISSIONS TAB â”€â”€ */}
+            {activeTab === "submissions" && (
+              <div>
+                {subLoading ? (
+                  <div style={{ color: "#9ca3af", fontSize: "14px", textAlign: "center", marginTop: "40px" }}>Loading...</div>
+                ) : !submissionsData || submissionsData.submissions?.length === 0 ? (
+                  <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", marginTop: "60px" }}>No submissions yet.</div>
+                ) : (
+                  <>
+                    {/* Stats Row */}
+                    <div style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+                      <div style={{ backgroundColor: "#252b3b", borderRadius: "8px", padding: "12px 20px", textAlign: "center", flex: 1 }}>
+                        <p style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "4px" }}>Total</p>
+                        <p style={{ fontSize: "20px", fontWeight: "700", color: "#f3f4f6" }}>{submissionsData.totalSubmissions}</p>
+                      </div>
+                      <div style={{ backgroundColor: "#252b3b", borderRadius: "8px", padding: "12px 20px", textAlign: "center", flex: 1 }}>
+                        <p style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "4px" }}>Accepted</p>
+                        <p style={{ fontSize: "20px", fontWeight: "700", color: "#10b981" }}>{submissionsData.acceptedSubmissions}</p>
+                      </div>
+                      <div style={{ backgroundColor: "#252b3b", borderRadius: "8px", padding: "12px 20px", textAlign: "center", flex: 1 }}>
+                        <p style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "4px" }}>Rate</p>
+                        <p style={{ fontSize: "20px", fontWeight: "700", color: "#a78bfa" }}>{submissionsData.acceptanceRate}%</p>
+                      </div>
+                    </div>
+
+                    {/* Submission List */}
+                    {submissionsData.submissions.map((sub, i) => (
+                      <div key={sub._id || i} style={{ backgroundColor: "#1e2433", borderRadius: "10px", border: "1px solid #2a2f3e", marginBottom: "10px", overflow: "hidden" }}>
+
+                        {/* Header Row */}
+                        <div
+                          onClick={() => setExpandedSub(expandedSub === i ? null : i)}
+                          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <span style={{ fontSize: "14px", fontWeight: "600", color: statusColor(sub.status) }}>
+                              {sub.status}
+                            </span>
+                            <span style={{ fontSize: "12px", color: "#6b7280", backgroundColor: "#252b3b", padding: "2px 10px", borderRadius: "20px" }}>
+                              {sub.language}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                              {new Date(sub.createdAt).toLocaleString()}
+                            </span>
+                            <span style={{ color: "#6b7280", fontSize: "12px" }}>
+                              {expandedSub === i ? "â–²" : "â–¼"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Expanded Code View */}
+                        {expandedSub === i && (
+                          <div style={{ borderTop: "1px solid #2a2f3e" }}>
+
+                            {/* Testcase stats */}
+                            <div style={{ display: "flex", gap: "16px", padding: "10px 16px", backgroundColor: "#252b3b", fontSize: "12px", color: "#9ca3af" }}>
+                              <span>Testcases: <span style={{ color: "#f3f4f6", fontWeight: "600" }}>{sub.testcasepassed ?? "?"}/{sub.totaltestcase ?? "?"}</span></span>
+                              {sub.runtime > 0 && <span>Runtime: <span style={{ color: "#f3f4f6", fontWeight: "600" }}>{sub.runtime}s</span></span>}
+                              {sub.memory > 0 && <span>Memory: <span style={{ color: "#f3f4f6", fontWeight: "600" }}>{sub.memory} KB</span></span>}
+                            </div>
+
+                            {/* Code */}
+                            <div style={{ padding: "12px 16px" }}>
+                              <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "8px" }}>Code</p>
+                              <pre style={{ backgroundColor: "#0b1220", borderRadius: "8px", padding: "14px", fontSize: "12px", color: "#d1d5db", overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0 }}>
+                                {sub.code}
+                              </pre>
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        
+
+        {/* â”€â”€ RIGHT â”€â”€ */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+          {/* Right Tabs */}
+          <div style={{ display: "flex", background: "#1e2433", borderBottom: "1px solid #2a2f3e", flexShrink: 0 }}>
+            {["code", "result"].map((t) => (
+              <button key={t} onClick={() => setActiveRightTab(t)}
+                style={{ padding: "10px 16px", fontSize: "13px", fontWeight: "500", cursor: "pointer", background: "none", border: "none",
+                  color: activeRightTab === t ? "#f3f4f6" : "#6b7280",
+                  borderBottom: activeRightTab === t ? "2px solid #a78bfa" : "2px solid transparent" }}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Editor */}
+          {activeRightTab === "code" && (
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <Editor
+                height="100%"
+                language={LANGUAGE_MAP[selectedLang]?.monacoLang || "cpp"}
+                value={code}
+                onMount={(e) => (editorRef.current = e)}
+                onChange={(v) => setCode(v || "")}
+                theme="vs-dark"
+                options={{ fontSize: 14, minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 12 } }}
+              />
+            </div>
+          )}
+
+          {/* Result */}
+          {activeRightTab === "result" && (
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+
+              {(running || submitting) && (
+                <div style={{ color: "#9ca3af", fontSize: "14px" }}>Running your code...</div>
+              )}
+
+              {result?.error && (
+                <div style={{ backgroundColor: "#ef444422", border: "1px solid #ef444444", borderRadius: "8px", padding: "16px", color: "#f87171", fontSize: "14px" }}>
+                  {result.error}
+                </div>
+              )}
+
+              {result && !result.error && (
+                <div>
+                  {/* Verdict */}
+                  {result.verdict && (
+                    <div style={{ marginBottom: "20px" }}>
+                      <span style={{ fontSize: "20px", fontWeight: "700", color: statusColor(result.verdict) }}>
+                        {result.verdict === "Accepted" ? "âœ“ Accepted" : `âœ— ${result.verdict}`}
+                      </span>
+                      <span style={{ marginLeft: "12px", fontSize: "14px", color: "#9ca3af" }}>
+                        {result.passedCount}/{result.total} testcases
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Per testcase */}
+                  {result.results?.map((r, i) => (
+                    <div key={i} style={{ marginBottom: "10px", backgroundColor: "#252b3b", borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: "#d1d5db", lineHeight: "1.8", borderLeft: `3px solid ${r.passed ? "#10b981" : "#ef4444"}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <span style={{ fontWeight: "600", color: r.passed ? "#10b981" : "#ef4444" }}>
+                          {r.passed ? "âœ“" : "âœ—"} Testcase {i + 1}
+                        </span>
+                      </div>
+                      <div><span style={{ color: "#9ca3af" }}>Input: </span>{r.input}</div>
+                      <div><span style={{ color: "#9ca3af" }}>Expected: </span>{r.expectedOutput}</div>
+                      <div>
+  <span style={{ color: "#9ca3af" }}>Got: </span>
+  <span style={{ color: r.passed ? "#10b981" : "#f87171" }}>
+    {r.actualOutput || "No output"}
+  </span>
+</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!result && !running && !submitting && (
+                <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", marginTop: "60px" }}>
+                  Run or Submit your code to see results.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default ProblemPage;
+
+================================================================================
+FILE: Frontend\src\pages\Signup.jsx
+================================================================================
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {useDispatch, useSelector} from 'react-redux';
+import {registerUser} from '../authslice';
+import { useEffect } from 'react';
+import { useState } from 'react';
+import { useNavigate, NavLink } from 'react-router-dom';
+
+import { setUser } from "../authslice";
+import axios from "axios";
+
+
+const signupSchema = z.object({
+  firstName: z.string().min(3, "First name must be at least 3 characters long"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+});
+
+function Signup() {
+  const[showPassword, setShowPassword] = useState(false);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const {isAuthenticated,loading,error} = useSelector((state) => state.auth);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(signupSchema)
+  });
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const onSubmit = (data) => {
+     dispatch(registerUser({
+    firstName: data.firstName,
+    emailId: data.email,
+    password: data.password
+  }));
+  }
+
+  // ðŸ”¥ GOOGLE SIGNUP HANDLER (DISABLED - KEPT FOR STRUCTURE)
+  const handleGoogleSignup = async (response) => {
+    try {
+      const token = response.credential;
+
+      const res = await axios.post("/auth/google", {
+        token,
+      });
+
+      dispatch(setUser({ user: res.data.user || res.data }));
+
+      setTimeout(() => {
+        navigate("/");
+      }, 100);
+
+    } catch (err) {
+      console.log("Google Signup Failed:", err);
+    }
+  };
+
+  // ðŸ”¥ GOOGLE SDK INIT (DISABLED - KEPT STRUCTURE SAME)
+  useEffect(() => {
+    /*
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      if (!window.google) return;
+
+      window.google.accounts.id.initialize({
+        client_id: "119229563975-rg28o97on0qc4k68uu7j9jufcbentusl.apps.googleusercontent.com",
+        callback: handleGoogleSignup,
+      });
+
+      window.google.accounts.id.renderButton(
+        document.getElementById("googleSignupBtn"),
+        {
+          theme: "outline",
+          size: "large",
+        }
+      );
+    };
+
+    document.body.appendChild(script);
+    */
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col justify-center items-center bg-[#1e2330]">
+
+      <div className="w-[520px] flex flex-col items-center">
+
+        <h1 className="text-5xl font-bold mb-24 text-center">
+          <span className="text-purple-400">CodeShinzo</span>
+          <span className="text-white"> â€“ Where logic meets code.</span>
+        </h1>
+        <br />
+
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="w-full flex flex-col gap-y-7"
+        >
+
+          {/* First Name */}
+          <div className="flex flex-col gap-y-2">
+            <label className="text-gray-300 text-base">First Name</label>
+            <input
+              type="text"
+              placeholder="John"
+              className={`w-full px-5 py-4 text-base rounded-md bg-[#2a3042] border text-white placeholder-gray-500 outline-none focus:border-purple-500 transition
+                ${errors.firstName ? 'border-red-500' : 'border-[#3d4663]'}`}
+              {...register("firstName")}
+            />
+            {errors.firstName && (
+              <span className="text-red-400 text-xs">{errors.firstName.message}</span>
+            )}
+          </div>
+
+          {/* Email */}
+          <div className="flex flex-col gap-y-2">
+            <label className="text-gray-300 text-base">Email</label>
+            <input
+              type="email"
+              placeholder="john@example.com"
+              className={`w-full px-5 py-4 text-base rounded-md bg-[#2a3042] border text-white placeholder-gray-500 outline-none focus:border-purple-500 transition
+                ${errors.email ? 'border-red-500' : 'border-[#3d4663]'}`}
+              {...register("email")}
+            />
+            {errors.email && (
+              <span className="text-red-400 text-xs">{errors.email.message}</span>
+            )}
+          </div>
+
+          {/* Password */}
+          <div className="flex flex-col gap-y-2">
+            <label className="text-gray-300 text-base">Password</label>
+
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Min. 8 characters"
+                className={`w-full px-5 py-4 pr-12 text-base rounded-md bg-[#2a3042] border text-white placeholder-gray-500 outline-none focus:border-purple-500 transition
+                ${errors.password ? 'border-red-500' : 'border-[#3d4663]'}`}
+                {...register("password")}
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-purple-400"
+              >
+                {showPassword ? "ðŸ™ˆ" : "ðŸ‘"}
+              </button>
+            </div>
+
+            {errors.password && (
+              <span className="text-red-400 text-xs">{errors.password.message}</span>
+            )}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="p-4 bg-red-500/20 border border-red-500 text-red-300 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+            </div>
+          )}
+
+          {/* GOOGLE BUTTON REMOVED (structure kept) */}
+          <div className="flex flex-col items-center gap-3 mb-4 mt-2">
+            {/* googleSignupBtn removed */}
+            {/* OR removed */}
+          </div>
+
+          {/* Already have account */}
+          <div className="flex justify-center items-center gap-2 mt-1">
+            <span className="text-gray-400 text-sm">Already have an account?</span>
+            <NavLink
+              to="/login"
+              className="text-purple-400 hover:text-purple-300 text-sm font-semibold transition duration-200"
+            >
+              Login
+            </NavLink>
+          </div>
+          <button
+  type="submit"
+  className="w-full py-4 mt-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-md transition"
+>
+  Signup
+</button>
+
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default Signup;
+
+================================================================================
+FILE: .vscode\settings.json
+================================================================================
+
+{
+  "terminal.integrated.cwd": "C:\\Users\\prath\\OneDrive\\Desktop\\Leetcode project"
+}
+

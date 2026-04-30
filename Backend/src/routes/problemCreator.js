@@ -39,15 +39,4 @@ router.get("/submittedproblems/:pid", userMiddleware, submittedProblemsbyUser);
 router.post("/run/:id", userMiddleware, runCode);
 router.post("/submit/:id", userMiddleware, submitSolution);
 
-module.exports = router;// this is submit.js - the router for handling code submission requests from the frontend, which includes the /submit/:id route that accepts POST requests with the user's code and language, and calls the submitSolution controller to execute the code and return the results
-
-
-
-
-
-
-/* =========================
-   SUBMIT ROUTE
-========================= */
-
 module.exports = router;
