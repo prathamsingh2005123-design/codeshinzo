@@ -31,9 +31,7 @@ function Login() {
 
 useEffect(() => {
   if (isAuthenticated) {
-    setTimeout(() => {
-      navigate('/');
-    }, 2000); // 2 sec delay
+    navigate('/');
   }
 }, [isAuthenticated]);
 
