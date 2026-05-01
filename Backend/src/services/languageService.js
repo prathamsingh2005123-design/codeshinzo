@@ -17,9 +17,9 @@ const LANGUAGE_MAP = {
 };
 
 /* =========================
-   JUDGE0 CONFIG
+   JUDGE0 CONFIG (UPDATED)
 ========================= */
-const JUDGE0_URL = process.env.JUDGE0_URL || "http://localhost:2358";
+const JUDGE0_URL = "https://ce.judge0.com";
 
 /* =========================
    LANGUAGE RESOLVER (FIXED)
@@ -48,70 +48,48 @@ const getLanguageId = async (language) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* =========================
-   SUBMIT BATCH (JUDGE0)
+   SUBMIT BATCH (UPDATED - PUBLIC API)
 ========================= */
 const submitBatch = async (submissions) => {
   try {
-    console.log("🔥 Sending to Judge0...");
+    console.log("🔥 Sending to Judge0 (Public API)...");
 
-    // encode base64
-    const encodedSubmissions = submissions.map((s) => ({
-      source_code: Buffer.from(s.source_code || "").toString("base64"),
-      language_id: s.language_id,
-      stdin: Buffer.from(s.stdin || "").toString("base64"),
-    }));
+    const results = [];
 
-    console.log("📦 Encoded submissions ready:", encodedSubmissions.length);
+    for (let i = 0; i < submissions.length; i++) {
+      const s = submissions[i];
 
-    const response = await axios.post(
-      `${JUDGE0_URL}/submissions/batch?base64_encoded=true`,
-      { submissions: encodedSubmissions }
-    );
+      try {
+        const response = await axios.post(
+          `${JUDGE0_URL}/submissions?base64_encoded=false&wait=true`,
+          {
+            source_code: s.source_code,
+            language_id: s.language_id,
+            stdin: s.stdin || "",
+          }
+        );
 
-    const tokens = response.data.map((t) => t.token);
-    const tokenString = tokens.join(",");
+        const r = response.data;
 
-    let results = [];
-    let attempts = 0;
+        results.push({
+          token: r.token || null,
+          stdout: r.stdout || "",
+          stderr: r.stderr || "",
+          compile_output: r.compile_output || "",
+          status: r.status,
+        });
 
-    const MAX_ATTEMPTS = 25;
-    const TIMEOUT_MS = 25000;
-    const start = Date.now();
+      } catch (innerErr) {
+        console.log("⚠️ Single submission failed:", innerErr.message);
 
-    while (attempts < MAX_ATTEMPTS) {
-      if (Date.now() - start > TIMEOUT_MS) {
-        throw new Error("Judge0 timeout: execution too slow");
+        results.push({
+          token: null,
+          stdout: "",
+          stderr: "",
+          compile_output: innerErr.message,
+          status: { id: 6, description: "Error" },
+        });
       }
-
-      await sleep(1000);
-
-      const res = await axios.get(
-        `${JUDGE0_URL}/submissions/batch?tokens=${tokenString}&base64_encoded=true`
-      );
-
-      results = res.data.submissions.map((r, i) => ({
-        token: tokens[i],
-
-        stdout: r.stdout
-          ? Buffer.from(r.stdout, "base64").toString()
-          : "",
-
-        stderr: r.stderr
-          ? Buffer.from(r.stderr, "base64").toString()
-          : "",
-
-        compile_output: r.compile_output
-          ? Buffer.from(r.compile_output, "base64").toString()
-          : "",
-
-        status: r.status,
-      }));
-
-      const allDone = results.every((r) => r.status?.id >= 3);
-
-      if (allDone) break;
-
-      attempts++;
     }
 
     if (!results || results.length === 0) {
@@ -121,6 +99,7 @@ const submitBatch = async (submissions) => {
     console.log("✅ Judge0 execution completed");
 
     return results;
+
   } catch (err) {
     console.log("❌ JUDGE0 ERROR:", err.message);
     throw err;
