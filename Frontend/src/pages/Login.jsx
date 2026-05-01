@@ -3,9 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, NavLink } from 'react-router-dom';
-import { loginUser, setUser } from '../authslice';
+import { loginUser } from '../authslice';
 import { useEffect, useState } from 'react';
-import axios from "axios";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -29,63 +28,35 @@ function Login() {
     resolver: zodResolver(loginSchema),
   });
 
-useEffect(() => {
-  if (isAuthenticated) {
-    navigate('/');
-  }
-}, [isAuthenticated]);
-
-  // 🟢 GOOGLE LOGIN HANDLER (REMOVED USAGE BUT KEPT COMMENT FOR STRUCTURE)
-  const handleGoogleLogin = async (response) => {
-    try {
-      const token = response.credential;
-
-      const res = await axios.post("/auth/google", { token });
-
-      dispatch(setUser(res.data));
-      navigate("/");
-    } catch (err) {
-      console.log(err);
-    }
-  };
-
-  // 🔥 GOOGLE SDK INIT (DISABLED BUT KEPT STRUCTURE)
   useEffect(() => {
-    /*
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated]);
 
-    script.onload = () => {
-      if (!window.google) return;
-
-      window.google.accounts.id.initialize({
-        client_id: "119229563975-rg28o97on0qc4k68uu7j9jufcbentusl.apps.googleusercontent.com",
-        callback: handleGoogleLogin,
-      });
-
-      window.google.accounts.id.renderButton(
-        document.getElementById("googleBtn"),
-        {
-          theme: "outline",
-          size: "large",
-        }
-      );
-    };
-
-    document.body.appendChild(script);
-    */
-  }, []);
-
-  const onSubmit = (data) => {
+  // 🔥 FINAL FIX HERE
+  const onSubmit = async (data) => {
     console.log("FORM SUBMITTED ✅", data);
-    dispatch(
-      loginUser({
-        emailId: data.email,
-        password: data.password,
-      })
-    );
+
+    try {
+      const res = await dispatch(
+        loginUser({
+          emailId: data.email,
+          password: data.password,
+        })
+      ).unwrap(); // 🔥 IMPORTANT
+
+      console.log("LOGIN RESPONSE =", res);
+
+      // ✅ SAVE TOKEN
+      if (res.token) {
+        localStorage.setItem("token", res.token);
+        console.log("TOKEN SAVED ✅");
+      }
+
+    } catch (err) {
+      console.log("LOGIN ERROR ❌", err);
+    }
   };
 
   return (
@@ -158,12 +129,6 @@ useEffect(() => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
             </div>
           )}
-
-          {/* 🔥 GOOGLE BUTTON REMOVED (kept spacing same intentionally) */}
-          <div className="flex flex-col items-center gap-3 mb-4">
-            {/* removed googleBtn */}
-            {/* removed OR divider */}
-          </div>
 
           {/* Button */}
           <div className="flex justify-center mt-2">
