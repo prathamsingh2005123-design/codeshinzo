@@ -5,6 +5,9 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
+// debug (temporary)
+console.log("BASE URL =", "https://codeshinzo-backend.onrender.com/api");
+
 // attach token
 axiosClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
