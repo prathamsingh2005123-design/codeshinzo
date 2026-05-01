@@ -2,6 +2,7 @@ import axios from "axios";
 
 const axiosClient = axios.create({
   baseURL: "https://codeshinzo-backend.onrender.com/api",
+  withCredentials: true,
 });
 
 // 🔥 TOKEN ATTACH

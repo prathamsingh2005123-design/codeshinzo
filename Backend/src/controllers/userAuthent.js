@@ -42,7 +42,11 @@ const register = async (req, res) => {
     sameSite: "lax",      // 🔥 VERY IMPORTANT
     maxAge: 3600000
 });
-        res.status(201).json({ message: 'User registered successfully',  user: reply });
+        res.status(201).json({
+            message: 'User registered successfully',
+            user: reply,
+            token,
+        });
     } 
 
     
@@ -79,8 +83,9 @@ res.cookie('token', token, {
 });
      res.status(200).json({
         user: reply,
+        token,
         message: "User logged in successfully",
-     })
+     });
 
     }
     catch(error){
@@ -90,14 +95,11 @@ res.cookie('token', token, {
 
 const logout = async(req,res)=>{
     try{
-       const {token} = req.cookies;
-       const payload = jwt.decode(token);
-       res.cookie('token', token, {
-    httpOnly: true,
-    secure: false,        // localhost pe false
-    sameSite: "lax",      // 🔥 VERY IMPORTANT
-    maxAge: 3600000
-});
+       res.clearCookie('token', {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+       });
        res.send("User logged out successfully");
         
     }
