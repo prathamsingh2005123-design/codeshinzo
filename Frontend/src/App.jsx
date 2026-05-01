@@ -17,22 +17,33 @@ import { checkAuth } from "./authslice";
 // ── Protected Route ──
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useSelector((state) => state.auth);
-  if (loading) return (
+  const token = localStorage.getItem("token");
+  
+  // Show spinner only while actually checking auth
+  if (loading && token) return (
     <div className="min-h-screen flex items-center justify-center bg-[#1e2330]">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
     </div>
   );
+  
+  // No token = not authenticated
+  if (!token) return <Navigate to="/login" replace />;
+  
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
 // ── Admin Route ──
 const AdminRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useSelector((state) => state.auth);
-  if (loading) return (
+  const token = localStorage.getItem("token");
+  
+  if (loading && token) return (
     <div className="min-h-screen flex items-center justify-center bg-[#1e2330]">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
     </div>
   );
+  
+  if (!token) return <Navigate to="/login" replace />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role !== "admin") return <Navigate to="/" replace />;
   return children;
@@ -40,9 +51,17 @@ const AdminRoute = ({ children }) => {
 
 function App() {
   const dispatch = useDispatch();
+  const { loading } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    dispatch(checkAuth());
+    // Only check auth if we have a token
+    const token = localStorage.getItem("token");
+    if (token) {
+      dispatch(checkAuth());
+    } else {
+      // No token - set loading to false immediately
+      dispatch({ type: "auth/checkAuth/rejected", payload: null });
+    }
   }, [dispatch]);
 
   return (
