@@ -18,6 +18,15 @@ const contestRouter = require("./routes/contestRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const authRoutes = require("./routes/auth");
 
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://codeshinzo.vercel.app",
+    "https://codeshinzo-git-main-coderpro1762-9312s-projects.vercel.app"
+  ],
+  credentials: true,
+}));
+
 const port = Number(process.env.PORT) || 3000;
 
 // ✅ CREATE SERVER (IMPORTANT)
