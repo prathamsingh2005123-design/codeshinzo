@@ -2,13 +2,9 @@ import axios from "axios";
 
 const axiosClient = axios.create({
   baseURL: "https://codeshinzo-backend.onrender.com/api",
-  withCredentials: true,
 });
 
-// debug (temporary)
-console.log("BASE URL =", "https://codeshinzo-backend.onrender.com/api");
-
-// attach token
+// 🔥 AUTO ATTACH TOKEN
 axiosClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
 

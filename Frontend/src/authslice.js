@@ -18,7 +18,7 @@ export const registerUser = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.message ||
+        error.response?.data?.error ||
         error.message ||
         "Registration failed"
       );
@@ -35,7 +35,7 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await axiosClient.post("/user/login", credentials);
 
-      // ✅ SAVE TOKEN (MAIN FIX)
+      // ✅ SAVE TOKEN
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
       }
@@ -43,7 +43,7 @@ export const loginUser = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.message ||
+        error.response?.data?.error ||
         error.message ||
         "Login failed"
       );
@@ -74,13 +74,10 @@ export const logoutUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await axiosClient.post("/user/logout");
+      localStorage.removeItem("token"); // ✅ remove here
       return null;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message ||
-        error.message ||
-        "Logout failed"
-      );
+      return rejectWithValue("Logout failed");
     }
   }
 );
@@ -106,7 +103,7 @@ const authSlice = createSlice({
     },
 
     logoutLocal: (state) => {
-      localStorage.removeItem("token"); // ✅ IMPORTANT
+      localStorage.removeItem("token");
       state.user = null;
       state.isAuthenticated = false;
       state.loading = false;
@@ -117,14 +114,14 @@ const authSlice = createSlice({
   extraReducers: (builder) => {
     builder
 
-      /* ---------- REGISTER ---------- */
+      /* REGISTER */
       .addCase(registerUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
-        const userData = action.payload?.user || action.payload?.reply;
+        const userData = action.payload?.user;
         state.user = userData;
         state.isAuthenticated = !!userData;
       })
@@ -134,14 +131,14 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
 
-      /* ---------- LOGIN ---------- */
+      /* LOGIN */
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        const userData = action.payload?.user || action.payload?.reply;
+        const userData = action.payload?.user;
         state.user = userData;
         state.isAuthenticated = !!userData;
       })
@@ -151,10 +148,10 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
 
-      /* ---------- CHECK AUTH ---------- */
+      /* CHECK AUTH */
       .addCase(checkAuth.fulfilled, (state, action) => {
         state.loading = false;
-        const userData = action.payload?.reply || action.payload?.user;
+        const userData = action.payload?.reply;
 
         if (userData && userData._id) {
           state.user = userData;
@@ -170,19 +167,12 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
 
-      /* ---------- LOGOUT ---------- */
+      /* LOGOUT */
       .addCase(logoutUser.fulfilled, (state) => {
-        localStorage.removeItem("token"); // ✅ IMPORTANT
         state.user = null;
         state.isAuthenticated = false;
         state.loading = false;
         state.error = null;
-      })
-      .addCase(logoutUser.rejected, (state) => {
-        localStorage.removeItem("token");
-        state.user = null;
-        state.isAuthenticated = false;
-        state.loading = false;
       });
   },
 });
