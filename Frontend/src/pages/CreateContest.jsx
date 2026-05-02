@@ -34,14 +34,19 @@ const CreateContest = () => {
   const handleCreate = async () => {
     setLoading(true);
     try {
-      await axiosClient.post("/contests/create", {
+      const payload = {
         title,
         description,
-        startTime,
         duration,
         problems: selectedProblems,
         tabSwitchBanEnabled,
-      });
+      };
+
+      if (startTime) {
+        payload.startTime = new Date(startTime).toISOString();
+      }
+
+      await axiosClient.post("/contests/create", payload);
       alert("Contest Created 🚀");
       navigate("/contests");
     } catch (err) {

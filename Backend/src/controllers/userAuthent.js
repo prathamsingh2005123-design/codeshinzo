@@ -38,8 +38,8 @@ const register = async (req, res) => {
 
      res.cookie('token', token, {
     httpOnly: true,
-    secure: false,        // localhost pe false
-    sameSite: "lax",      // 🔥 VERY IMPORTANT
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 3600000
 });
         res.status(201).json({
@@ -77,8 +77,8 @@ const login = async(req,res)=>{
 const token= jwt.sign({ _id: user._id ,role:user.role, emailId: user.emailId },process.env.JWT_SECRET_KEY,{expiresIn: '1h'});
 res.cookie('token', token, {
     httpOnly: true,
-    secure: false,        // localhost pe false
-    sameSite: "lax",      // 🔥 VERY IMPORTANT
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 3600000
 });
      res.status(200).json({
@@ -97,8 +97,8 @@ const logout = async(req,res)=>{
     try{
        res.clearCookie('token', {
             httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
        });
        res.send("User logged out successfully");
         
@@ -131,8 +131,8 @@ const adminRegister = async (req, res) => {
         );
      res.cookie('token', token, {
     httpOnly: true,
-    secure: false,        // localhost pe false
-    sameSite: "lax",      // 🔥 VERY IMPORTANT
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 3600000
 });
         res.status(201).json({ message: 'Admin registered successfully', token, userId: user._id });
