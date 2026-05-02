@@ -49,6 +49,10 @@ const runCode = async (req, res) => {
     const problemId = req.params.id;
     const { code, language } = req.body;
 
+    if (!code || !language) {
+      return res.status(400).json({ success: false, error: "Code and language are required" });
+    }
+
     const problem = await Problem.findById(problemId)
       .select("_id visibletestcases hiddentestcases driverCode starterCode");
 
@@ -129,8 +133,13 @@ const submitSolution = async (req, res) => {
     const userId = req.user._id;
     const problemId = req.params.id;
     const { code, language, contestId } = req.body;
+
+    if (!code || !language) {
+      return res.status(400).json({ success: false, error: "Code and language are required" });
+    }
+
     // ── Ban Check ──
-if (contestId) {
+    if (contestId) {
   const ban = await ContestBan.findOne({ userId, contestId });
   if (ban) {
     return res.status(403).json({

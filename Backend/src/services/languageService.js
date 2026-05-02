@@ -80,13 +80,20 @@ const submitBatch = async (submissions) => {
         });
 
       } catch (innerErr) {
-        console.log("⚠️ Single submission failed:", innerErr.message);
+        console.log("⚠️ Single submission failed:", innerErr.response?.status, innerErr.response?.data || innerErr.message);
+
+        const responseData = innerErr.response?.data;
+        const responseMessage = responseData
+          ? typeof responseData === "string"
+            ? responseData
+            : JSON.stringify(responseData)
+          : innerErr.message;
 
         results.push({
           token: null,
           stdout: "",
           stderr: "",
-          compile_output: innerErr.message,
+          compile_output: `Judge0 request failed: ${innerErr.response?.status || "unknown"} - ${responseMessage}`,
           status: { id: 6, description: "Error" },
         });
       }

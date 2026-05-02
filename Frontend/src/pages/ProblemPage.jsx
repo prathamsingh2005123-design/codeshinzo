@@ -68,7 +68,13 @@ function ProblemPage() {
       const { data } = await axiosClient.post(`/problems/run/${pid}`, { code, language: selectedLang });
       setResult(data);
     } catch (err) {
-      setResult({ error: err.response?.data?.error || "Run failed" });
+      setResult({
+        error:
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Run failed",
+      });
     } finally {
       setRunning(false);
     }
@@ -83,7 +89,13 @@ function ProblemPage() {
       setResult(data);
       fetchSubmissions();
     } catch (err) {
-      setResult({ error: err.response?.data?.error || "Submit failed" });
+      setResult({
+        error:
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Submit failed",
+      });
     } finally {
       setSubmitting(false);
     }

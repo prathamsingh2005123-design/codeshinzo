@@ -212,7 +212,13 @@ const handleVisibilityChange = useCallback(async () => {
       const res = await axiosClient.post(`/problems/run/${selectedProblem._id}`, { code, language });
       setResult(res.data);
     } catch (err) {
-      setResult({ error: err.response?.data?.error || err.message });
+      setResult({
+        error:
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Run failed",
+      });
     } finally {
       setRunning(false);
     }
@@ -235,7 +241,13 @@ const handleVisibilityChange = useCallback(async () => {
       });
       setResult(res.data);
     } catch (err) {
-      setResult({ error: err.response?.data?.error || err.message });
+      setResult({
+        error:
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Submit failed",
+      });
     } finally {
       setSubmitting(false);
     }
