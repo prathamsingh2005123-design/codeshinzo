@@ -43,6 +43,43 @@ const getLanguageId = async (language) => {
 };
 
 /* =========================
+   STDIN NORMALIZATION
+========================= */
+const formatInput = (input) => {
+  if (input == null) return "";
+  const raw = input.toString().trim();
+  if (raw === "") return "";
+
+  if (raw.includes("\n")) {
+    return raw;
+  }
+
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  if (tokens.length <= 1) {
+    return raw;
+  }
+
+  const n = Number(tokens[0]);
+  if (Number.isNaN(n) || n < 0) {
+    return raw;
+  }
+
+  const arr = tokens.slice(1, 1 + n);
+  const rest = tokens.slice(1 + n);
+  const lines = [tokens[0]];
+
+  if (arr.length) {
+    lines.push(arr.join(" "));
+  }
+
+  if (rest.length) {
+    lines.push(rest.join("\n"));
+  }
+
+  return lines.join("\n");
+};
+
+/* =========================
    UTIL
 ========================= */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -65,7 +102,7 @@ const submitBatch = async (submissions) => {
           {
             source_code: s.source_code,
             language_id: s.language_id,
-            stdin: s.stdin || "",
+            stdin: formatInput(s.stdin),
           }
         );
 
