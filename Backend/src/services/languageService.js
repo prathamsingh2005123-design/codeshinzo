@@ -45,6 +45,12 @@ const getLanguageId = async (language) => {
 /* =========================
    STDIN NORMALIZATION
 ========================= */
+const encodeBase64 = (value) =>
+  Buffer.from(value || "", "utf8").toString("base64");
+
+const decodeBase64 = (value) =>
+  value ? Buffer.from(value, "base64").toString("utf8") : "";
+
 const formatInput = (input) => {
   if (input == null) return "";
   const raw = input.toString().trim();
@@ -98,11 +104,11 @@ const submitBatch = async (submissions) => {
 
       try {
         const response = await axios.post(
-          `${JUDGE0_URL}/submissions?base64_encoded=false&wait=true`,
+          `${JUDGE0_URL}/submissions?base64_encoded=true&wait=true`,
           {
-            source_code: s.source_code,
+            source_code: encodeBase64(s.source_code),
             language_id: s.language_id,
-            stdin: formatInput(s.stdin),
+            stdin: encodeBase64(formatInput(s.stdin)),
           }
         );
 
@@ -110,9 +116,9 @@ const submitBatch = async (submissions) => {
 
         results.push({
           token: r.token || null,
-          stdout: r.stdout || "",
-          stderr: r.stderr || "",
-          compile_output: r.compile_output || "",
+          stdout: decodeBase64(r.stdout) || "",
+          stderr: decodeBase64(r.stderr) || "",
+          compile_output: decodeBase64(r.compile_output) || "",
           status: r.status,
         });
 
