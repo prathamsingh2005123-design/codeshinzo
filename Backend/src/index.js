@@ -16,71 +16,64 @@ const problemRouter = require('./routes/problemCreator');
 const submitRouter = require('./routes/submit');
 const contestRouter = require("./routes/contestRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
-const authRoutes = require("./routes/auth");
 
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://codeshinzo.vercel.app"
-  ],
-  credentials: true,
-}));
-const port = Number(process.env.PORT) || 3000;
-
-// ✅ CREATE SERVER (IMPORTANT)
+// ✅ CREATE SERVER
 const server = http.createServer(app);
 
-// ✅ ALLOWED ORIGINS (NEW SAFE ADDITION)
+// ✅ ALL ALLOWED ORIGINS (UPDATED)
 const allowedOrigins = [
-    'http://localhost:5173',
-    'https://codeshinzo.vercel.app',
-    'https://codeshinzo-git-main-coderpro1762-9312s-projects.vercel.app'
+  "http://localhost:5173",
+  "https://codeshinzo.vercel.app",
+  "https://newcodeshinzo-x8zr.vercel.app"
 ];
 
-// ✅ SOCKET SETUP (UPDATED)
+// ✅ CORS MIDDLEWARE (ONLY ONCE)
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+}));
+
+// ✅ SOCKET.IO
 const io = new Server(server, {
-    cors: {
-        origin: allowedOrigins,
-        credentials: true,
-    },
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
 });
 
-// ✅ INIT SOCKET
 initContestSocket(io);
-
-// ✅ EXPRESS CORS (UPDATED)
-app.use(cors({
-    origin: ["http://localhost:5173", "https://codeshinzo.vercel.app"],
-    credentials: true,
-}));
 
 app.use(express.json());
 app.use(cookieParser());
 
+const port = Number(process.env.PORT) || 3000;
+
 const Initializeconnection = async () => {
-    try {
-        console.log('DB_CONNECTION_STRING:', process.env.DB_CONNECTION_STRING);
+  try {
+    await main();
+    console.log("Connected to DB ✔");
 
-        await main();
-
-        console.log("Connected to DB ✔");
-
-        // ROUTES
+    // ROUTES
     app.use("/api/user", authRouter);
-app.use("/api/problems", problemRouter);
-app.use("/api/submission", submitRouter);
-app.use("/api/contests", contestRouter);
-app.use("/api/leaderboard", leaderboardRoutes);
+    app.use("/api/problems", problemRouter);
+    app.use("/api/submission", submitRouter);
+    app.use("/api/contests", contestRouter);
+    app.use("/api/leaderboard", leaderboardRoutes);
 
-        // ❗ IMPORTANT CHANGE HERE
-        server.listen(port, () => {
-            console.log(`Server running on port ${port}`);
-        });
+    server.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
 
-    } catch (error) {
-        console.error("DB connection error:", error);
-        process.exit(1);
-    }
+  } catch (error) {
+    console.error("DB connection error:", error);
+    process.exit(1);
+  }
 };
 
 Initializeconnection();
