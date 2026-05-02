@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { getContest } from "../utils/contestApi";
 import Editor from "@monaco-editor/react";
 import axiosClient from "../utils/axiosClient";
+import socket from "../socket";
 
 const LANGUAGE_MAP = {
   "C++": "cpp",
@@ -48,6 +49,30 @@ const ContestPage = () => {
     };
     fetchContest();
   }, [id]);
+
+  // ── Join Contest Socket Room ──
+  useEffect(() => {
+    if (contest?._id && user?._id) {
+      socket.emit("joinContest", {
+        contestId: contest._id,
+        userId: user._id,
+      });
+    }
+  }, [contest?._id, user?._id]);
+
+  // ── Listen for Violation Updates ──
+  useEffect(() => {
+    const handleViolationUpdate = (data) => {
+      console.log("Violation update received:", data);
+      // Could show warnings here if needed
+    };
+
+    socket.on("violationUpdate", handleViolationUpdate);
+
+    return () => {
+      socket.off("violationUpdate", handleViolationUpdate);
+    };
+  }, []);
 
   // ── Check Ban Status on Load ──
   useEffect(() => {
@@ -106,6 +131,13 @@ const handleVisibilityChange = useCallback(async () => {
   if (document.hidden) {
     tabSwitchRef.current = true;
     try {
+      // Emit to socket for broadcasting
+      socket.emit("tabSwitch", {
+        contestId: id,
+        userId: user._id,
+      });
+
+      // Call ban API
       const res = await axiosClient.post("/contests/ban/tabswitch", {
         contestId: id,
       });
@@ -118,7 +150,7 @@ const handleVisibilityChange = useCallback(async () => {
       tabSwitchRef.current = false;
     }
   }
-}, [contestStatus, isBanned, id, contest?.tabSwitchBanEnabled]); // ← dependency add
+}, [contestStatus, isBanned, id, contest?.tabSwitchBanEnabled, user._id]); // ← dependency add
 
   useEffect(() => {
     document.addEventListener("visibilitychange", handleVisibilityChange);

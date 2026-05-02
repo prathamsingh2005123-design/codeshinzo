@@ -2,7 +2,7 @@ const Contest = require("../models/contest");
 
 const createContest = async (req, res) => {
   try {
-    const { title, startTime, duration, problems } = req.body;
+    const { title, startTime, duration, problems, tabSwitchBanEnabled } = req.body;
 
     console.log("🔥 CREATE CONTEST HIT");
     console.log("BODY:", req.body);
@@ -14,6 +14,7 @@ const createContest = async (req, res) => {
       duration,
       problems,
       createdBy: req.user?._id,
+      tabSwitchBanEnabled: tabSwitchBanEnabled || false,
     });
 
     console.log("✅ CONTEST CREATED:", contest._id);
