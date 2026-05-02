@@ -20,6 +20,11 @@ const banUser = async (req, res) => {
       return res.status(404).json({ success: false, message: "Contest not found" });
     }
 
+    // Check if tab switch ban is enabled for this contest
+    if (!contest.tabSwitchBanEnabled) {
+      return res.status(400).json({ success: false, message: "Tab switch ban not enabled for this contest" });
+    }
+
     // Agar pehle se ban hai toh tabSwitchCount badhao
     const existing = await ContestBan.findOne({ userId, contestId });
 
