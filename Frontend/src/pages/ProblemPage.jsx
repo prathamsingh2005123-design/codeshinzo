@@ -365,7 +365,7 @@ function ProblemPage() {
                       <div><span style={{ color: "#9ca3af" }}>Expected: </span>{r.expectedOutput}</div>
                       <div>
   <span style={{ color: "#9ca3af" }}>Got: </span>
-  <span style={{ color: r.passed ? "#10b981" : "#f87171" }}>
+  <span style={{ color: r.passed ? "#10b981" : "#f87171", whiteSpace: "pre-wrap", display: "inline-block", maxWidth: "100%" }}>
     {r.actualOutput || "No output"}
   </span>
 </div>

@@ -29,6 +29,11 @@ const cleanError = (err) => {
   if (lineNumber) finalMsg += `Line ${lineNumber}: `;
   if (codeLine) finalMsg += `${codeLine}\n`;
   if (message) finalMsg += `${message}\n`;
+
+  if (!lineNumber && !codeLine && !message) {
+    return err.trim();
+  }
+
   if (codeLine.includes("cin >")) finalMsg += "Hint: Did you mean 'cin >> n' ?";
   if (codeLine.includes("cout <")) finalMsg += "Hint: Did you mean 'cout <<' ?";
   return finalMsg;
