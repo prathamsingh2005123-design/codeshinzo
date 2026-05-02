@@ -9,7 +9,7 @@ const problemSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters long"),
   description: z.string().min(20, "Description must be at least 20 characters long"),
   difficulty: z.enum(["Easy", "Medium", "Hard"]),
-  tags: z.enum(['Array', 'String', 'Linked List', 'Tree', 'Graph', 'Dynamic Programming', 'Backtracking', 'Greedy', 'Sorting', 'Searching']),
+  tags: z.string().min(1, "Select a tag"),
   visibletestcases: z.array(z.object({
     input: z.string().min(1, "Input is required"),
     output: z.string().min(1, "Output is required"),
@@ -26,7 +26,15 @@ const problemSchema = z.object({
   referenceSolution: z.array(z.object({
     language: z.enum(['JavaScript', 'Python', 'Java', 'C++']),
     completeCode: z.string().optional()
-  })).min(1, "At least one reference solution is required"),
+  })).superRefine((solutions, ctx) => {
+    if (!solutions.some((sol) => sol.completeCode?.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one reference solution must contain code",
+        path: ["referenceSolution"],
+      });
+    }
+  }),
   driverCode: z.array(z.object({
     language: z.enum(['JavaScript', 'Python', 'Java', 'C++']),
     code: z.string().optional()
@@ -87,8 +95,13 @@ function AdminPanel() {
 
   const onSubmit = async (data) => {
     try {
+      const tagsValue = Array.isArray(data.tags)
+        ? data.tags.filter(Boolean)
+        : [data.tags].filter(Boolean);
+
       const filteredData = {
         ...data,
+        tags: tagsValue,
         starterCode: data.starterCode.filter(s => s.intialCode?.trim() !== ""),
         referenceSolution: data.referenceSolution.filter(r => r.completeCode?.trim() !== ""),
         driverCode: data.driverCode.filter(d => d.code?.trim() !== ""),
@@ -97,8 +110,8 @@ function AdminPanel() {
       alert("Problem created successfully!");
       navigate("/");
     } catch (err) {
-      console.error("Error creating problem:", err);
-      alert("Failed to create problem. Please check the console for details.");
+      console.error("Error creating problem:", err.response?.data || err);
+      alert(`Failed to create problem: ${err.response?.data?.message || err.message}`);
     }
   };
 

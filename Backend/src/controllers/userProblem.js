@@ -42,6 +42,10 @@ const createProblem = async (req, res) => {
       });
     }
 
+    const tagsArray = Array.isArray(tags)
+      ? tags.filter((tag) => tag && tag.toString().trim() !== "")
+      : [tags].filter((tag) => tag && tag.toString().trim() !== "");
+
     const allTestcases = [...visibletestcases, ...hiddentestcases];
 
 
@@ -94,7 +98,7 @@ const problemCreatorId = req.user?._id;
       title,
       description,
       difficulty,
-      tags,
+      tags: tagsArray,
       visibletestcases,
       hiddentestcases,
       referenceSolution: filteredReference,
