@@ -304,6 +304,17 @@ const handleVisibilityChange = useCallback(async () => {
         </div>
       )}
 
+      {/* ── TAB SWITCH WARNING BANNER ── */}
+      {contest?.tabSwitchBanEnabled && contestStatus === "live" && !isBanned && (
+        <div style={{
+          backgroundColor: "#f59e0b22", borderBottom: "1px solid #f59e0b",
+          padding: "8px 20px", textAlign: "center", fontSize: "13px",
+          color: "#fbbf24", fontWeight: "600", flexShrink: 0
+        }}>
+          ⚠️ Tab switching is monitored during this contest. Switching tabs may result in disqualification.
+        </div>
+      )}
+
       {/* ── NAVBAR ── */}
       <div style={{ height: "50px", background: "#0b1220", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", flexShrink: 0 }}>
         <NavLink to="/" style={{ color: "#a78bfa", fontWeight: "700", textDecoration: "none", fontSize: "15px" }}>
