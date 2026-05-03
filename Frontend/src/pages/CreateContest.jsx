@@ -19,7 +19,7 @@ const CreateContest = () => {
         const res = await axiosClient.get("/problems/getallproblems");
         setProblems(res.data);
       } catch (err) {
-        console.log(err);
+        // suppress problem list fetch errors from browser console
       }
     };
     fetchProblems();
@@ -50,7 +50,6 @@ const CreateContest = () => {
       alert("Contest Created 🚀");
       navigate("/contests");
     } catch (err) {
-      console.log(err);
       alert("Failed to create contest");
     } finally {
       setLoading(false);

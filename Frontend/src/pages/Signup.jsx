@@ -7,8 +7,6 @@ import { useEffect } from 'react';
 import { useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 
-import { setUser } from "../authslice";
-import axios from "axios";
 
 
 const signupSchema = z.object({
@@ -53,22 +51,7 @@ function Signup() {
 
   // 🔥 GOOGLE SIGNUP HANDLER (DISABLED - KEPT FOR STRUCTURE)
   const handleGoogleSignup = async (response) => {
-    try {
-      const token = response.credential;
-
-      const res = await axios.post("/auth/google", {
-        token,
-      });
-
-      dispatch(setUser({ user: res.data.user || res.data }));
-
-      setTimeout(() => {
-        navigate("/");
-      }, 100);
-
-    } catch (err) {
-      console.log("Google Signup Failed:", err);
-    }
+    // Google signup is disabled in this build.
   };
 
   // 🔥 GOOGLE SDK INIT (DISABLED - KEPT STRUCTURE SAME)

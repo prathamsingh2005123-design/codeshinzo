@@ -39,7 +39,7 @@ function ProblemPage() {
         const starter = data?.starterCode?.find((s) => s.language === "C++");
         setCode(starter?.intialCode || "// Write your solution here");
       } catch (err) {
-        console.error(err);
+        // suppress problem fetch errors from browser console
       } finally {
         setLoading(false);
       }
@@ -53,7 +53,7 @@ function ProblemPage() {
       const { data } = await axiosClient.get(`/problems/submittedproblems/${pid}`);
       setSubmissionsData(data);
     } catch (err) {
-      console.error(err);
+      // suppress submission fetch errors from browser console
       setSubmissionsData(null);
     } finally {
       setSubLoading(false);

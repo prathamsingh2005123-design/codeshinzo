@@ -5,7 +5,7 @@ const socket = io("https://codeshinzo-backend.onrender.com", {
 });
 
 socket.on("connect", () => {
-  console.log("Socket connected:", socket.id);
+  // Connected
 });
 
 export default socket;

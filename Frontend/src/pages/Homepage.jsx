@@ -8,8 +8,7 @@ import { checkAuth } from "../authslice";
 function Homepage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
- const user = useSelector((state) => state.auth?.user);
-  console.log("USER =", user);
+  const user = useSelector((state) => state.auth?.user);
 
   const [problems, setProblems] = useState([]);
   const [solvedProblems, setSolvedProblems] = useState([]);
@@ -41,7 +40,7 @@ function Homepage() {
         const { data } = await axiosClient.get("/problems/getallproblems");
         setProblems(data);
       } catch (err) {
-        console.error("Error fetching problems:", err);
+        setProblems([]);
       }
     };
 
@@ -52,7 +51,7 @@ function Homepage() {
         );
         setSolvedProblems(data);
       } catch (err) {
-        console.error("Error fetching solved problems:", err);
+        setSolvedProblems([]);
       }
     };
 

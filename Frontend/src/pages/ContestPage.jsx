@@ -44,7 +44,7 @@ const ContestPage = () => {
         const data = await getContest(id);
         setContest(data.contest);
       } catch (err) {
-        console.log("Contest Fetch Error:", err);
+        // suppress fetch error details from browser console
       }
     };
     fetchContest();
@@ -63,8 +63,7 @@ const ContestPage = () => {
   // ── Listen for Violation Updates ──
   useEffect(() => {
     const handleViolationUpdate = (data) => {
-      console.log("Violation update received:", data);
-      // Could show warnings here if needed
+      // receive violation updates silently; additional UI alerts can be added here
     };
 
     socket.on("violationUpdate", handleViolationUpdate);
@@ -85,7 +84,7 @@ const ContestPage = () => {
           setTabSwitchCount(res.data.tabSwitchCount);
         }
       } catch (err) {
-        console.log("Ban check error:", err);
+        // suppress ban error details from browser console
       }
     };
     checkBan();
@@ -145,8 +144,7 @@ const handleVisibilityChange = useCallback(async () => {
       setTabSwitchCount(res.data.tabSwitchCount || 1);
       setShowBanAlert(true);
     } catch (err) {
-      console.log("Tab switch ban error:", err);
-    } finally {
+        // suppress tab-switch error details from browser console
       tabSwitchRef.current = false;
     }
   }
@@ -168,7 +166,7 @@ const handleVisibilityChange = useCallback(async () => {
         const res = await axiosClient.get(`/leaderboard/${contest._id}`);
         setLeaderboard(res.data.board || []);
       } catch (err) {
-        console.log("Leaderboard Error:", err);
+        // suppress leaderboard error details from browser console
       }
     };
 
@@ -177,7 +175,7 @@ const handleVisibilityChange = useCallback(async () => {
         const res = await axiosClient.get(`/contests/ban/all/${contest._id}`);
         setBannedUsers(res.data.bans || []);
       } catch (err) {
-        console.log("Banned users error:", err);
+        // suppress banned users error details from browser console
       }
     };
 

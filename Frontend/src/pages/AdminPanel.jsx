@@ -110,7 +110,6 @@ function AdminPanel() {
       alert("Problem created successfully!");
       navigate("/");
     } catch (err) {
-      console.error("Error creating problem:", err.response?.data || err);
       alert(`Failed to create problem: ${err.response?.data?.message || err.message}`);
     }
   };

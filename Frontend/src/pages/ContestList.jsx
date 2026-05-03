@@ -20,7 +20,6 @@ const ContestList = () => {
       const data = await getContests();
       setContests(data?.contests || []);
     } catch (err) {
-      console.log(err);
       setError("Failed to load contests");
     } finally {
       setLoading(false);
