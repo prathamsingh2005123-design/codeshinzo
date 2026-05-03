@@ -111,6 +111,14 @@ function Profile() {
           <div style={S.name}>{displayName}</div>
           <div style={S.role}>{user?.role === "admin" ? "Administrator" : "Problem Solver"}</div>
 
+          {/* Email */}
+          {user?.emailId && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#94a3b8", fontSize: "14px", marginBottom: "16px" }}>
+              <span>✉️</span>
+              <span>{user.emailId}</span>
+            </div>
+          )}
+
           {/* Rating Badge */}
           <div style={S.ratingBadge}>⚡ Rating: {userRating}</div>
 
