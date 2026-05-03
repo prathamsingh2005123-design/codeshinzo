@@ -234,7 +234,8 @@ function Homepage() {
 
           <button
             onClick={() => {
-              if (user && user.role && user.role.toLowerCase() === "admin") {
+              const isAdmin = user && user.role && user.role.toLowerCase() === "admin";
+              if (isAdmin) {
                 navigate("/admin");
               } else {
                 alert("You are not an admin");
@@ -242,18 +243,17 @@ function Homepage() {
             }}
             style={{
               padding: "10px 14px",
-              background: "#f59e0b",
+              background: user && user.role && user.role.toLowerCase() === "admin" ? "#f59e0b" : "#6b7280",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
-              cursor: "pointer"
+              cursor: user && user.role && user.role.toLowerCase() === "admin" ? "pointer" : "not-allowed"
             }}
           >
-            ➕ Create Problem
+            {user && user.role && user.role.toLowerCase() === "admin" ? "➕ Create Problem" : "🔒 Admin only"}
           </button>
 
-          {/* 👑 ADMIN ONLY BUTTON */}
-         {user && user.role && user.role.toLowerCase() === "admin" &&  (
+          {user && user.role && user.role.toLowerCase() === "admin" && (
             <button
               onClick={() => navigate("/admin/contest")}
               style={{
