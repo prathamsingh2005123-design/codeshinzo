@@ -121,7 +121,7 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
-        const userData = action.payload?.user;
+        const userData = action.payload?.user || action.payload;
         state.user = userData;
         state.isAuthenticated = !!userData;
       })
@@ -138,7 +138,7 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        const userData = action.payload?.user;
+        const userData = action.payload?.user || action.payload;
         state.user = userData;
         state.isAuthenticated = !!userData;
       })
@@ -151,7 +151,7 @@ const authSlice = createSlice({
       /* CHECK AUTH */
       .addCase(checkAuth.fulfilled, (state, action) => {
         state.loading = false;
-        const userData = action.payload?.reply;
+        const userData = action.payload?.reply || action.payload;
 
         if (userData && userData._id) {
           state.user = userData;

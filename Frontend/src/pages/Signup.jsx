@@ -31,19 +31,25 @@ function Signup() {
     resolver: zodResolver(signupSchema)
   });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthenticated, navigate]);
+  const onSubmit = async (data) => {
+    try {
+      const res = await dispatch(
+        registerUser({
+          firstName: data.firstName,
+          emailId: data.email,
+          password: data.password,
+        })
+      ).unwrap();
 
-  const onSubmit = (data) => {
-     dispatch(registerUser({
-    firstName: data.firstName,
-    emailId: data.email,
-    password: data.password
-  }));
-  }
+      if (res.token) {
+        localStorage.setItem("token", res.token);
+      }
+
+      navigate('/');
+    } catch (err) {
+      // Error handled by Redux
+    }
+  };
 
   // 🔥 GOOGLE SIGNUP HANDLER (DISABLED - KEPT FOR STRUCTURE)
   const handleGoogleSignup = async (response) => {

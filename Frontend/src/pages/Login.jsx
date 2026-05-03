@@ -28,34 +28,22 @@ function Login() {
     resolver: zodResolver(loginSchema),
   });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthenticated]);
-
-  // 🔥 FINAL FIX HERE
   const onSubmit = async (data) => {
-    console.log("FORM SUBMITTED ✅", data);
-
     try {
       const res = await dispatch(
         loginUser({
           emailId: data.email,
           password: data.password,
         })
-      ).unwrap(); // 🔥 IMPORTANT
+      ).unwrap();
 
-      console.log("LOGIN RESPONSE =", res);
-
-      // ✅ SAVE TOKEN
       if (res.token) {
         localStorage.setItem("token", res.token);
-        console.log("TOKEN SAVED ✅");
       }
 
+      navigate('/');
     } catch (err) {
-      console.log("LOGIN ERROR ❌", err);
+      // Error handled by Redux
     }
   };
 
