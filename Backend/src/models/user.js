@@ -32,6 +32,10 @@ const userSchema = new Schema({
   acceptedSubmissions: { type: Number, default: 0 },
   totalSolved: { type: Number, default: 0 }
 },
+    rating: {
+        type: Number,
+        default: 0
+    },
    problemsSolved: {
   type: [{
     type: mongoose.Schema.Types.ObjectId,

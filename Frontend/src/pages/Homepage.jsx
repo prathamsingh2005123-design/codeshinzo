@@ -172,7 +172,7 @@ function Homepage() {
               onClick={() => setShowLogout((p) => !p)}
               style={{ background: "none", border: "none", color: "#fff" }}
             >
-              {user?.name || "Profile"}
+              {user?.firstName || "Profile"}
             </button>
 
             {showLogout && (

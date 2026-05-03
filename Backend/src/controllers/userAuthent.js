@@ -33,7 +33,8 @@ const register = async (req, res) => {
             firstName: user.firstName,
             emailId: user.emailId,
             _id: user._id,
-            role: user.role
+            role: user.role,
+            rating: user.rating || 0
         }
 
      res.cookie('token', token, {
@@ -72,7 +73,8 @@ const login = async(req,res)=>{
     firstName: user.firstName,
     emailId: user.emailId,
     _id: user._id,
-    role: user.role   
+    role: user.role,
+    rating: user.rating || 0
 }
 const token= jwt.sign({ _id: user._id ,role:user.role, emailId: user.emailId },process.env.JWT_SECRET_KEY,{expiresIn: '1h'});
 res.cookie('token', token, {

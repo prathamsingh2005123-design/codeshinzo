@@ -1,4 +1,5 @@
 const Leaderboard = require("../models/leaderboard");
+const User = require("../models/user");
 
 const getContestLeaderboard = async (req, res) => {
   try {
@@ -12,7 +13,7 @@ const getContestLeaderboard = async (req, res) => {
     }
 
     const leaderboard = await Leaderboard.find({ contestId })
-      .populate("userId", "firstName emailId");
+      .populate("userId", "firstName emailId rating");
 
     const board = leaderboard
       .map((entry) => ({
@@ -21,6 +22,7 @@ const getContestLeaderboard = async (req, res) => {
           entry.userId?.firstName ||
           entry.userId?.emailId ||
           "Unknown",
+        rating: entry.userId?.rating || 0,
         score: entry.score,
         solved: entry.solvedCount,
       }))
@@ -43,4 +45,25 @@ const getContestLeaderboard = async (req, res) => {
   }
 };
 
-module.exports = { getContestLeaderboard };
+const getGlobalLeaderboard = async (req, res) => {
+  try {
+    const users = await User.find({})
+      .select("firstName emailId rating")
+      .sort({ rating: -1 })
+      .limit(10);
+
+    const board = users.map((u, i) => ({
+      rank: i + 1,
+      userId: u._id,
+      name: u.firstName || u.emailId || "Unknown",
+      rating: u.rating || 0,
+    }));
+
+    return res.status(200).json({ success: true, board });
+  } catch (err) {
+    console.log("❌ Global Leaderboard Error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = { getContestLeaderboard, getGlobalLeaderboard };

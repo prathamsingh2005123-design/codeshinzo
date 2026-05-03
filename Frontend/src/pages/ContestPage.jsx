@@ -22,6 +22,7 @@ const ContestPage = () => {
   const [code, setCode] = useState("// Select a problem to start coding");
   const [leaderboard, setLeaderboard] = useState([]);
   const [result, setResult] = useState(null);
+  const [ratingIncrease, setRatingIncrease] = useState(0);
   const [activeLeftTab, setActiveLeftTab] = useState("problems");
   const [activeRightTab, setActiveRightTab] = useState("code");
   const [running, setRunning] = useState(false);
@@ -231,6 +232,7 @@ const handleVisibilityChange = useCallback(async () => {
     setSubmitting(true);
     setActiveRightTab("result");
     setResult(null);
+    setRatingIncrease(0);
     try {
       const res = await axiosClient.post(`/problems/submit/${selectedProblem._id}`, {
         code,
@@ -238,6 +240,9 @@ const handleVisibilityChange = useCallback(async () => {
         contestId: contest._id,
       });
       setResult(res.data);
+      if (res.data.verdict === "Accepted" && res.data.ratingIncrease > 0) {
+        setRatingIncrease(res.data.ratingIncrease);
+      }
     } catch (err) {
       setResult({
         error:
@@ -501,7 +506,7 @@ const handleVisibilityChange = useCallback(async () => {
                 ) : (
                   <>
                     <div style={{
-                      display: "grid", gridTemplateColumns: "44px 1fr 50px 60px 40px",
+                      display: "grid", gridTemplateColumns: "44px 1fr 50px 60px 70px 40px",
                       padding: "8px 12px", background: "#111827", borderRadius: "6px",
                       marginBottom: "6px", fontSize: "11px", color: "#9ca3af", fontWeight: "600"
                     }}>
@@ -509,6 +514,7 @@ const handleVisibilityChange = useCallback(async () => {
                       <span>Name</span>
                       <span style={{ textAlign: "center" }}>Solved</span>
                       <span style={{ textAlign: "center" }}>Score</span>
+                      <span style={{ textAlign: "center" }}>Rating</span>
                       <span style={{ textAlign: "center" }}>Flag</span>
                     </div>
 
@@ -517,7 +523,7 @@ const handleVisibilityChange = useCallback(async () => {
                       return (
                         <div key={entry.userId?.toString() || i}
                           style={{
-                            display: "grid", gridTemplateColumns: "44px 1fr 50px 60px 40px",
+                            display: "grid", gridTemplateColumns: "44px 1fr 50px 60px 70px 40px",
                             padding: "10px 12px", background: banned ? "#ef444411" : "#1e2433",
                             border: `1px solid ${banned ? "#ef444444" : "#2a2f3e"}`,
                             borderRadius: "8px", marginBottom: "6px", fontSize: "13px", color: "#d1d5db"
@@ -536,6 +542,9 @@ const handleVisibilityChange = useCallback(async () => {
                           </span>
                           <span style={{ textAlign: "center", color: "#a78bfa", fontWeight: "700" }}>
                             {entry.score || 0}
+                          </span>
+                          <span style={{ textAlign: "center", color: "#60a5fa", fontWeight: "600", fontSize: "12px" }}>
+                            ⚡{entry.rating ?? "—"}
                           </span>
                           <span style={{ textAlign: "center", fontSize: "16px" }}>
                             {banned ? "🚩" : ""}
@@ -630,6 +639,23 @@ const handleVisibilityChange = useCallback(async () => {
               )}
               {result && !result.error && (
                 <div>
+                  {/* Rating Increase Toast */}
+                  {ratingIncrease > 0 && (
+                    <div style={{
+                      marginBottom: "16px",
+                      padding: "12px 18px",
+                      background: "rgba(167,139,250,0.15)",
+                      border: "1px solid #7c3aed55",
+                      borderRadius: "10px",
+                      display: "flex", alignItems: "center", gap: "10px",
+                      color: "#a78bfa", fontWeight: 700, fontSize: "15px"
+                    }}>
+                      ⚡ +{ratingIncrease} Rating earned!
+                      <span style={{ fontSize: "12px", fontWeight: 400, color: "#94a3b8" }}>
+                        Your new rating: {(user?.rating || 0) + ratingIncrease}
+                      </span>
+                    </div>
+                  )}
                   {(result.verdict || result.status) && (
                     <div style={{ marginBottom: "20px" }}>
                       <span style={{ fontSize: "20px", fontWeight: "700", color: statusColor(result.verdict || result.status) }}>

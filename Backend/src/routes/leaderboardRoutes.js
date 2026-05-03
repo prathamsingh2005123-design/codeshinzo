@@ -1,10 +1,13 @@
 const express = require("express");
 const router = express.Router();
 
-const { getContestLeaderboard } = require("../controllers/leaderboardController");
+const { getContestLeaderboard, getGlobalLeaderboard } = require("../controllers/leaderboardController");
 const userMiddleware = require("../middleware/userMiddleware");
 
-// Both admin and user can access
+// Global top-10 by rating
+router.get("/", userMiddleware, getGlobalLeaderboard);
+
+// Contest-specific leaderboard
 router.get("/:contestId", userMiddleware, getContestLeaderboard);
 
-module.exports = router;
+module.exports = router;

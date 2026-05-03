@@ -13,6 +13,7 @@ import ContestList from "./pages/ContestList";
 import ContestPage from "./pages/ContestPage";
 import CreateContest from "./pages/CreateContest";
 import Profile from "./pages/Profile";
+import UserProfile from "./pages/UserProfile";
 import { checkAuth } from "./authslice";
 
 // ── Protected Route ──
@@ -77,9 +78,10 @@ function App() {
         <Route path="/" element={<ProtectedRoute><Homepage /></ProtectedRoute>} />
         <Route path="/problems/:pid" element={<ProtectedRoute><ProblemPage /></ProtectedRoute>} />
         <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/profile/:userId" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/contests" element={<ProtectedRoute><ContestList /></ProtectedRoute>} />
         <Route path="/contest/:id" element={<ProtectedRoute><ContestPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         {/* ── ADMIN ONLY ── */}
         <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />

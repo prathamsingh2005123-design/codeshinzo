@@ -44,18 +44,47 @@ authRouter.delete("/deleteprofile", userMiddleware, (req, res) => {
 // =======================
 // AUTH CHECK ROUTE
 // =======================
-authRouter.get("/check-auth", userMiddleware, (req, res) => {
-    const reply = {
-        firstName: req.user.firstName,
-        emailId: req.user.emailId,
-        _id: req.user._id,
-        role: req.user.role
-    };
+authRouter.get("/check-auth", userMiddleware, async (req, res) => {
+    try {
+        const User = require('../models/user');
+        const dbUser = await User.findById(req.user._id).select('firstName emailId role rating');
+        const reply = {
+            firstName: dbUser.firstName,
+            emailId: dbUser.emailId,
+            _id: dbUser._id,
+            role: dbUser.role,
+            rating: dbUser.rating || 0
+        };
+        res.status(200).json({
+            reply,
+            message: "User is authenticated"
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Auth check failed" });
+    }
+});
 
-    res.status(200).json({
-        reply,
-        message: "User is authenticated"
-    });
+// Public profile by userId
+authRouter.get("/profile/:userId", userMiddleware, async (req, res) => {
+    try {
+        const User = require('../models/user');
+        const Problem = require('../models/problem');
+        const dbUser = await User.findById(req.params.userId)
+            .select('firstName emailId role rating problemsSolved stats')
+            .populate('problemsSolved', 'title difficulty tags');
+        if (!dbUser) return res.status(404).json({ error: "User not found" });
+        res.status(200).json({
+            _id: dbUser._id,
+            firstName: dbUser.firstName,
+            emailId: dbUser.emailId,
+            role: dbUser.role,
+            rating: dbUser.rating || 0,
+            problemsSolved: dbUser.problemsSolved || [],
+            stats: dbUser.stats
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch profile" });
+    }
 });
 
 

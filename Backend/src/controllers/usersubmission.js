@@ -249,6 +249,8 @@ const submitSolution = async (req, res) => {
       }
 
       // 🔥🔥🔥 LEADERBOARD FIX START 🔥🔥🔥
+      let ratingIncrease = 0;
+
       if (contestId) {
         const scoreMap = {
           easy: 100,
@@ -256,8 +258,16 @@ const submitSolution = async (req, res) => {
           hard: 300,
         };
 
+        const ratingMap = {
+          easy: 2,
+          medium: 5,
+          hard: 10,
+        };
+
         const score =
           scoreMap[problem.difficulty?.toLowerCase()] || 0;
+
+        ratingIncrease = ratingMap[problem.difficulty?.toLowerCase()] || 0;
 
         let entry = await Leaderboard.findOne({
           contestId,
@@ -284,11 +294,16 @@ const submitSolution = async (req, res) => {
           entry.solvedProblems.push(problemId);
           entry.score += score;
           entry.solvedCount += 1;
+          // Update user rating only for new solves in contest
+          await User.findByIdAndUpdate(userId, {
+            $inc: { rating: ratingIncrease }
+          });
+        } else {
+          ratingIncrease = 0; // already solved, no rating boost
         }
 
         await entry.save();
       }
-      // 🔥🔥🔥 LEADERBOARD FIX END 🔥🔥🔥
     }
 
     return res.status(200).json({
@@ -299,6 +314,7 @@ const submitSolution = async (req, res) => {
       total,
       submission,
       results: detailedResults,
+      ratingIncrease: typeof ratingIncrease !== 'undefined' ? ratingIncrease : 0,
     });
 
   } catch (error) {
