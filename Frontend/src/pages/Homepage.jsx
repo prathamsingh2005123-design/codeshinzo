@@ -232,6 +232,26 @@ function Homepage() {
             🏆 Leaderboard
           </button>
 
+          <button
+            onClick={() => {
+              if (user && user.role && user.role.toLowerCase() === "admin") {
+                navigate("/admin");
+              } else {
+                alert("You are not an admin");
+              }
+            }}
+            style={{
+              padding: "10px 14px",
+              background: "#f59e0b",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer"
+            }}
+          >
+            ➕ Create Problem
+          </button>
+
           {/* 👑 ADMIN ONLY BUTTON */}
          {user && user.role && user.role.toLowerCase() === "admin" &&  (
             <button

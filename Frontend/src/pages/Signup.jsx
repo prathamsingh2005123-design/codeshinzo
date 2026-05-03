@@ -11,7 +11,10 @@ import { useNavigate, NavLink } from 'react-router-dom';
 
 const signupSchema = z.object({
   firstName: z.string().min(3, "First name must be at least 3 characters long"),
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Invalid email address").refine((email) => {
+    const domain = email.split('@')[1];
+    return !domain || domain.toLowerCase() !== 'gail.com'; // Reject common typo
+  }, "Invalid email domain"),
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 

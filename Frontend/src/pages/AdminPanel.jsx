@@ -212,7 +212,7 @@ function AdminPanel() {
           <div style={S.section}>
             <p style={S.sectionHead}>Starter Code</p>
             <div style={S.infoBox}>
-              User ko yahi code dikhega editor mein. Sirf function signature likho — input/output driver code alag section mein hoga.
+              This code will be shown to users in the editor. Only write the function signature — input/output handling will be in a separate driver code section.
             </div>
             {["JavaScript", "Python", "Java", "C++"].map((lang, index) => (
               <div key={lang} style={{ ...S.tcBox, marginBottom: "12px" }}>
@@ -232,7 +232,7 @@ function AdminPanel() {
           <div style={S.section}>
             <p style={S.sectionHead}>Driver Code (Input/Output Handler)</p>
             <div style={S.infoBox}>
-              Yeh code user ko nahi dikhega. Yeh stdin se input parse karega, user ke function ko call karega, aur output print karega. User ke starter code ke saath automatically append hoga.
+              This code will not be visible to users. It will parse input from stdin, call the user's function, and print the output. It will be automatically appended to the user's starter code.
             </div>
             {["JavaScript", "Python", "Java", "C++"].map((lang, index) => (
               <div key={lang} style={{ ...S.tcBox, marginBottom: "12px" }}>
