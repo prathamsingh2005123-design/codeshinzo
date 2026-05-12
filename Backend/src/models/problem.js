@@ -9,6 +9,10 @@ const testcaseSchema = new mongoose.Schema({
   output: {
     type: String,
     required: true
+  },
+  explanation: {
+    type: String,
+    default: ''
   }
 });
 

@@ -202,14 +202,16 @@ function ProblemPage() {
                     )}
                   </div>
                 </div>
-                <p style={{ fontSize: "14px", color: "#d1d5db", lineHeight: "1.7", marginBottom: "24px" }}>{problem.description}</p>
+                <p style={{ fontSize: "14px", color: "#d1d5db", lineHeight: "1.7", marginBottom: "24px", whiteSpace: "pre-wrap" }}>{problem.description}</p>
                 {problem.visibletestcases?.map((tc, i) => (
                   <div key={i} style={{ marginBottom: "20px" }}>
                     <p style={{ fontSize: "14px", fontWeight: "600", color: "#f3f4f6", marginBottom: "8px" }}>Example {i + 1}:</p>
                     <div style={{ backgroundColor: "#252b3b", borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: "#d1d5db", lineHeight: "1.8" }}>
-                      <div><span style={{ color: "#9ca3af" }}>Input: </span>{tc.input}</div>
-                      <div><span style={{ color: "#9ca3af" }}>Output: </span>{tc.output}</div>
-                      {tc.explanation && <div><span style={{ color: "#9ca3af" }}>Explanation: </span>{tc.explanation}</div>}
+                      <div><span style={{ color: "#9ca3af" }}>Input: </span><span style={{ whiteSpace: "pre-wrap", fontFamily: "monospace" }}>{tc.input}</span></div>
+                      <div><span style={{ color: "#9ca3af" }}>Output: </span><span style={{ whiteSpace: "pre-wrap", fontFamily: "monospace" }}>{tc.output}</span></div>
+                      {tc.explanation && tc.explanation.trim() !== "" && (
+                        <div style={{ marginTop: "4px" }}><span style={{ color: "#9ca3af" }}>Explanation: </span><span style={{ whiteSpace: "pre-wrap" }}>{tc.explanation}</span></div>
+                      )}
                     </div>
                   </div>
                 ))}
