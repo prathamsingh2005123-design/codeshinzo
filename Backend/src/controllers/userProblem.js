@@ -28,6 +28,8 @@ const createProblem = async (req, res) => {
     visibletestcases,
     hiddentestcases,
     referenceSolution,
+    starterCode,
+    driverCode,
   } = req.body;
 
   try {
@@ -94,6 +96,14 @@ const problemCreatorId = req.user?._id;
     }
 
 
+    const filteredStarterCode = Array.isArray(starterCode)
+      ? starterCode.filter(s => s.intialCode && s.intialCode.trim() !== "")
+      : [];
+
+    const filteredDriverCode = Array.isArray(driverCode)
+      ? driverCode.filter(d => d.code && d.code.trim() !== "")
+      : [];
+
     const userProblem = await Problem.create({
       title,
       description,
@@ -102,6 +112,8 @@ const problemCreatorId = req.user?._id;
       visibletestcases,
       hiddentestcases,
       referenceSolution: filteredReference,
+      starterCode: filteredStarterCode,
+      driverCode: filteredDriverCode,
       problemCreator: problemCreatorId
     });
 
