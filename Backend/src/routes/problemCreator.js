@@ -12,6 +12,7 @@ const {
   updateProblem,
   deleteProblem,
   getProblemById,
+  getProblemForEdit,
   getAllProblems,
   solvedProblemsbyUser,
   submittedProblemsbyUser,
@@ -26,6 +27,7 @@ const {
 router.post("/create", adminmiddleware, createProblem);
 router.put("/update/:id", adminmiddleware, updateProblem);
 router.delete("/delete/:id", adminmiddleware, deleteProblem);
+router.get("/edit/:id", adminmiddleware, getProblemForEdit);
 
 /* PROBLEMS */
 router.get("/getallproblems", getAllProblems);

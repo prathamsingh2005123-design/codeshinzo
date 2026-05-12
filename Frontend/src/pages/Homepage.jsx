@@ -328,22 +328,79 @@ function Homepage() {
           </div>
         ) : (
           filteredProblems.map((problem) => (
-            <NavLink
+            <div
               key={problem._id}
-              to={`/problems/${problem._id}`}
               style={{
-                display: "block",
-                padding: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
                 background: "#1e2433",
                 marginBottom: "10px",
                 borderRadius: "10px",
-                textDecoration: "none"
+                overflow: "hidden",
               }}
             >
-              <div style={{ color: "#fff", marginBottom: "8px" }}>
-                {problem.title}
-              </div>
-            </NavLink>
+              <NavLink
+                to={`/problems/${problem._id}`}
+                style={{
+                  flex: 1,
+                  padding: "16px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <span style={{ color: "#fff", fontWeight: "500" }}>
+                  {problem.title}
+                </span>
+                <span style={{
+                  padding: "2px 10px",
+                  borderRadius: "20px",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  backgroundColor:
+                    problem.difficulty === "Easy" ? "#10b98122" :
+                    problem.difficulty === "Medium" ? "#f59e0b22" : "#ef444422",
+                  color:
+                    problem.difficulty === "Easy" ? "#10b981" :
+                    problem.difficulty === "Medium" ? "#f59e0b" : "#ef4444",
+                }}>
+                  {problem.difficulty}
+                </span>
+              </NavLink>
+
+              {user?.role === "admin" && (
+                <button
+                  onClick={() => navigate(`/admin/edit/${problem._id}`)}
+                  style={{
+                    margin: "0 12px",
+                    padding: "6px 14px",
+                    backgroundColor: "#374151",
+                    border: "1px solid #4b5563",
+                    borderRadius: "6px",
+                    color: "#d1d5db",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = "#2563eb";
+                    e.currentTarget.style.borderColor = "#2563eb";
+                    e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = "#374151";
+                    e.currentTarget.style.borderColor = "#4b5563";
+                    e.currentTarget.style.color = "#d1d5db";
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
           ))
         )}
       </div>

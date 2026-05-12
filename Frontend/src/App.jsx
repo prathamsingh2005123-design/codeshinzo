@@ -14,6 +14,7 @@ import ContestPage from "./pages/ContestPage";
 import CreateContest from "./pages/CreateContest";
 import Profile from "./pages/Profile";
 import UserProfile from "./pages/UserProfile";
+import EditProblem from "./pages/EditProblem";
 import { checkAuth } from "./authslice";
 
 // ── Protected Route ──
@@ -86,6 +87,7 @@ function App() {
         {/* ── ADMIN ONLY ── */}
         <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
         <Route path="/admin/contest" element={<AdminRoute><CreateContest /></AdminRoute>} />
+        <Route path="/admin/edit/:id" element={<AdminRoute><EditProblem /></AdminRoute>} />
 
       </Routes>
     </GoogleOAuthProvider>

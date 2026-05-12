@@ -151,6 +151,8 @@ const updateProblem = async (req, res) => {
     visibletestcases,
     hiddentestcases,
     referenceSolution,
+    starterCode,
+    driverCode,
   } = req.body;
 
   try {
@@ -202,6 +204,14 @@ const updateProblem = async (req, res) => {
     }
 
 
+    const filteredStarterCode = Array.isArray(starterCode)
+      ? starterCode.filter(s => s.intialCode && s.intialCode.trim() !== "")
+      : [];
+
+    const filteredDriverCode = Array.isArray(driverCode)
+      ? driverCode.filter(d => d.code && d.code.trim() !== "")
+      : [];
+
     const updatedProblem = await Problem.findByIdAndUpdate(
       id,
       {
@@ -211,7 +221,9 @@ const updateProblem = async (req, res) => {
         tags,
         visibletestcases,
         hiddentestcases,
-        referenceSolution: filteredReference
+        referenceSolution: filteredReference,
+        starterCode: filteredStarterCode,
+        driverCode: filteredDriverCode,
       },
       { runValidators: true, new: true }
     );
@@ -287,6 +299,20 @@ const getProblemById = async (req, res) => {
       error: error.message
     });
 
+  }
+};
+
+
+const getProblemForEdit = async (req, res) => {
+  try {
+    const problem = await Problem.findById(req.params.id);
+    if (!problem) {
+      return res.status(404).json({ message: "Problem not found" });
+    }
+    res.json(problem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -406,6 +432,7 @@ module.exports = {
   updateProblem,
   deleteProblem,
   getProblemById,
+  getProblemForEdit,
   getAllProblems,
   solvedProblemsbyUser,
   submittedProblemsbyUser
